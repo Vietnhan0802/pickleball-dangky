@@ -87,14 +87,7 @@
 }
 
 .form-ok { margin: 0 0 14px; padding: 10px 12px; background: var(--ok-soft); color: var(--ok); border-radius: var(--radius-sm); font-size: 0.875rem; font-weight: 500; }
-.login-switch { margin: 16px 0 0; text-align: center; font-size: 0.9375rem; color: var(--ink-2); }
-.login-switch .link-button { color: var(--court-deep); }
-
-.admins { margin-top: 20px; }
-.admin-list { list-style: none; margin: 0; padding: 0; }
-.admin-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 20px; border-top: 1px solid var(--rule); }
-.admin-list li:first-child { border-top: 0; }
-.admin-list .me { margin-left: 8px; font-size: 0.75rem; font-weight: 700; color: var(--ball-ink); background: var(--ball); padding: 1px 8px; border-radius: 999px; }
-.admin-add { padding: 16px 20px 20px; border-top: 1px solid var(--rule); background: var(--surface-2); }
-.admin-add .inline-field { display: flex; gap: 8px; }
-.admin-add input { flex: 1; min-width: 0; }
+.account { margin-top: 20px; }
+.password-form { display: grid; gap: 0 16px; padding: 18px 20px 20px; align-items: end; }
+@media (min-width: 720px) { .password-form { grid-template-columns: 1fr 1fr auto; } .password-form .button { margin-bottom: 18px; } }
+.password-form .form-ok, .password-form .field-error { grid-column: 1 / -1; margin: 0; }

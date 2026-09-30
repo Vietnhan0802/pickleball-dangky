@@ -2,7 +2,7 @@
 // Mô phỏng đúng các luật trong supabase/schema.sql để xem thử giao diện.
 import { normalizePhone, cleanName } from './logic.js';
 
-const DEMO_ADMIN = { email: 'admin@demo.vn', password: 'demo' };
+const DEMO_ADMIN = { email: 'admin@pickleball.local', password: 'demo' };
 
 export class BackendError extends Error {
   /** @param {string} code */
@@ -37,7 +37,6 @@ export function sampleState() {
       { id: 5, name: 'Khóa 5', capacity: 12, schedule: '' },
     ],
     rows,
-    admins: [DEMO_ADMIN.email],
   };
 }
 
@@ -48,6 +47,7 @@ export function createMockBackend(io = {}) {
   const now = io.now ?? (() => new Date());
   let state = io.load?.() ?? sampleState();
   let session = null;
+  let adminPassword = DEMO_ADMIN.password;
 
   const commit = (next) => {
     state = next;
@@ -145,14 +145,15 @@ export function createMockBackend(io = {}) {
     },
 
     async signIn(email, password) {
-      if (email !== DEMO_ADMIN.email || password !== DEMO_ADMIN.password) throw new BackendError('BAD_LOGIN');
+      if (email !== DEMO_ADMIN.email || password !== adminPassword) throw new BackendError('BAD_LOGIN');
       session = { email };
       return session;
     },
 
-    async signUp(email, password) {
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(email ?? '').trim())) throw new BackendError('INVALID_EMAIL');
+    async changePassword(password) {
+      requireAdmin();
       if (String(password ?? '').length < 8) throw new BackendError('WEAK_PASSWORD');
+      adminPassword = password;
       return { ok: true };
     },
 
@@ -201,30 +202,6 @@ export function createMockBackend(io = {}) {
           fill_in_order: fillInOrder ?? state.settings.fill_in_order,
         },
       });
-      return { ok: true };
-    },
-
-    async adminAdmins() {
-      requireAdmin();
-      return [...(state.admins ?? [])].sort();
-    },
-
-    async adminAddAdmin(email) {
-      requireAdmin();
-      const value = String(email ?? '').trim().toLowerCase();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)) throw new BackendError('INVALID_EMAIL');
-      const admins = state.admins ?? [];
-      if (!admins.includes(value)) commit({ ...state, admins: [...admins, value] });
-      return { ok: true };
-    },
-
-    async adminRemoveAdmin(email) {
-      requireAdmin();
-      const value = String(email ?? '').trim().toLowerCase();
-      if (value === session.email) throw new BackendError('CANNOT_REMOVE_SELF');
-      const admins = state.admins ?? [];
-      if (!admins.includes(value)) throw new BackendError('NOT_FOUND');
-      commit({ ...state, admins: admins.filter((a) => a !== value) });
       return { ok: true };
     },
 

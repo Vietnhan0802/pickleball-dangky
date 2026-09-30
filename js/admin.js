@@ -1,5 +1,5 @@
 import { createApi } from './api.js';
-import { errorMessage, formatPhone, toCsv, validateEmail, validatePassword } from './logic.js';
+import { errorMessage, formatPhone, loginEmail, toCsv, validatePassword } from './logic.js';
 
 const api = createApi();
 const $ = (id) => document.getElementById(id);
@@ -7,8 +7,6 @@ const ICONS = 'assets/icons.svg';
 
 let rows = [];
 let status = null;
-let admins = [];
-let mode = 'login';
 
 function h(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -128,30 +126,10 @@ function render() {
   );
 }
 
-function renderAdmins() {
-  const me = api.currentAdmin()?.email?.toLowerCase();
-  $('admins-count').textContent = `${admins.length} người`;
-  $('admin-list').replaceChildren(...admins.map((email) => {
-    const isMe = email === me;
-    const remove = isMe ? null : h('button', { type: 'button', class: 'icon-button', 'aria-label': `Gỡ quyền ${email}` }, icon('trash'));
-    remove?.addEventListener('click', () => {
-      if (!remove.classList.contains('is-armed')) {
-        remove.classList.add('is-armed');
-        remove.replaceChildren('Gỡ?');
-        setTimeout(() => { remove.classList.remove('is-armed'); remove.replaceChildren(icon('trash')); }, 4000);
-        return;
-      }
-      guarded(() => api.adminRemoveAdmin(email));
-    });
-    return h('li', {}, h('span', {}, email, isMe ? h('span', { class: 'me' }, 'bạn') : null), remove);
-  }));
-}
-
 async function load() {
   try {
-    [status, rows, admins] = await Promise.all([api.getStatus(), api.adminList(), api.adminAdmins()]);
+    [status, rows] = await Promise.all([api.getStatus(), api.adminList()]);
     render();
-    renderAdmins();
   } catch (err) {
     if (err.code === 'SESSION_EXPIRED' || err.code === 'FORBIDDEN') {
       await api.signOut();
@@ -175,60 +153,20 @@ async function showDash() {
   $('login').hidden = true;
   $('dash').hidden = false;
   $('bar-user').hidden = false;
-  $('admin-email').textContent = api.currentAdmin()?.email ?? '';
+  $('admin-email').textContent = (api.currentAdmin()?.email ?? '').split('@')[0];
   await load();
 }
 
-const LOGIN_TEXT = {
-  login: {
-    title: 'Đăng nhập quản trị', sub: 'Dùng email đã được cấp quyền quản trị.',
-    button: 'Đăng nhập', switchText: 'Lần đầu vào trang quản trị?', switchButton: 'Tạo mật khẩu',
-  },
-  signup: {
-    title: 'Tạo mật khẩu lần đầu', sub: 'Dùng đúng email đã được người quản trị cấp quyền.',
-    button: 'Tạo tài khoản', switchText: 'Đã có mật khẩu?', switchButton: 'Đăng nhập',
-  },
-};
-
-function setMode(next) {
-  mode = next;
-  const text = LOGIN_TEXT[mode];
-  $('login-title').textContent = text.title;
-  $('login-sub').textContent = text.sub;
-  $('login-label').textContent = text.button;
-  $('switch-text').textContent = text.switchText;
-  $('switch-mode').textContent = text.switchButton;
-  $('password-hint').hidden = mode !== 'signup';
-  $('password').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
-  $('login-error').hidden = true;
-}
-
-$('switch-mode').addEventListener('click', () => {
-  $('login-ok').hidden = true;
-  setMode(mode === 'login' ? 'signup' : 'login');
-});
-
 $('login').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const email = $('email').value.trim();
-  const password = $('password').value;
-  const invalid = validateEmail(email) ?? (mode === 'signup' ? validatePassword(password) : null);
-  $('login-ok').hidden = true;
-  if (invalid) return showLogin(invalid);
+  const email = loginEmail($('username').value);
+  if (!email || !$('password').value) return showLogin('Nhập tên đăng nhập và mật khẩu.');
 
   const submit = $('login-submit');
   submit.disabled = true;
   submit.classList.add('is-busy');
   try {
-    if (mode === 'signup') {
-      await api.signUp(email, password);
-      $('password').value = '';
-      setMode('login');
-      $('login-ok').textContent = `Đã gửi email xác nhận tới ${email}. Bấm link trong email rồi quay lại đây đăng nhập.`;
-      $('login-ok').hidden = false;
-      return;
-    }
-    await api.signIn(email, password);
+    await api.signIn(email, $('password').value);
     $('password').value = '';
     await showDash();
   } catch (err) {
@@ -239,15 +177,28 @@ $('login').addEventListener('submit', async (event) => {
   }
 });
 
-$('admin-add').addEventListener('submit', (event) => {
+$('password-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const email = $('new-admin').value.trim();
-  const invalid = validateEmail(email);
-  if (invalid) return showError(invalid);
-  guarded(async () => {
-    await api.adminAddAdmin(email);
-    $('new-admin').value = '';
-  });
+  const next = $('new-password').value;
+  const error = validatePassword(next, $('confirm-password').value);
+  $('password-ok').hidden = true;
+  $('password-error').hidden = !error;
+  $('password-error').textContent = error ?? '';
+  if (error) return;
+
+  $('password-submit').disabled = true;
+  try {
+    await api.changePassword(next);
+    $('new-password').value = '';
+    $('confirm-password').value = '';
+    $('password-ok').hidden = false;
+  } catch (err) {
+    if (err.code === 'SESSION_EXPIRED') return showLogin(errorMessage(err.code));
+    $('password-error').textContent = errorMessage(err.code);
+    $('password-error').hidden = false;
+  } finally {
+    $('password-submit').disabled = false;
+  }
 });
 
 $('sign-out').addEventListener('click', async () => {

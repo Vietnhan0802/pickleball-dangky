@@ -179,24 +179,13 @@ test('admin can list, move, delete and change settings; deleting promotes the wa
   assert.equal(after.fill_in_order, true);
 });
 
-test('admins can add and remove other admins but never themselves', async () => {
-  await db.exec("insert into admins values ('boss@congty.vn')");
-  await asAdmin('boss@congty.vn');
+test('the single admin account is seeded and admin management is not exposed', async () => {
+  const { rows } = await db.query('select email from admins');
+  assert.deepEqual(rows, [{ email: 'admin@pickleball.local' }]);
 
-  assert.deepEqual(await call('admin_add_admin', '  Linh.Tran@CongTy.vn '), { ok: true });
-  assert.deepEqual(await call('admin_add_admin', 'linh.tran@congty.vn'), { ok: true });
-  assert.deepEqual(await call('admin_admins'), ['boss@congty.vn', 'linh.tran@congty.vn']);
-  assert.equal(await errorOf(call('admin_add_admin', 'khong-phai-email')), 'INVALID_EMAIL');
-  assert.equal(await errorOf(call('admin_remove_admin', 'BOSS@congty.vn')), 'CANNOT_REMOVE_SELF');
+  const fns = await db.query("select proname from pg_proc where proname in ('admin_admins', 'admin_add_admin', 'admin_remove_admin')");
+  assert.equal(fns.rows.length, 0);
 
-  // Admin mới đăng nhập được quyền ngay.
-  await asAdmin('linh.tran@congty.vn');
+  await asAdmin('admin@pickleball.local');
   assert.deepEqual(await call('admin_list'), []);
-  await asAdmin('boss@congty.vn');
-  assert.deepEqual(await call('admin_remove_admin', 'linh.tran@congty.vn'), { ok: true });
-  assert.equal(await errorOf(call('admin_remove_admin', 'ai-do@x.vn')), 'NOT_FOUND');
-
-  await asAdmin('linh.tran@congty.vn');
-  assert.equal(await errorOf(call('admin_admins')), 'FORBIDDEN');
-  assert.equal(await errorOf(call('admin_add_admin', 'hacker@x.vn')), 'FORBIDDEN');
 });

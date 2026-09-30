@@ -16,7 +16,7 @@
 </head>
 <body>
   <div class="demo-strip" id="demo-strip" hidden>
-    <span>Chế độ demo · đăng nhập bằng <b>admin@demo.vn</b> / <b>demo</b></span>
+    <span>Chế độ demo · đăng nhập <b>admin</b> / <b>demo</b></span>
   </div>
 
   <header class="bar">
@@ -34,24 +34,18 @@
 
   <main class="admin">
     <form class="login" id="login" novalidate>
-      <h1 id="login-title">Đăng nhập quản trị</h1>
-      <p id="login-sub">Dùng email đã được cấp quyền quản trị.</p>
+      <h1>Đăng nhập quản trị</h1>
+      <p>Chỉ dành cho người tổ chức lớp.</p>
       <div class="field">
-        <label for="email">Email</label>
-        <input id="email" type="email" autocomplete="username" required>
+        <label for="username">Tên đăng nhập</label>
+        <input id="username" autocomplete="username" autocapitalize="none" spellcheck="false" value="admin" required>
       </div>
       <div class="field">
         <label for="password">Mật khẩu</label>
         <input id="password" type="password" autocomplete="current-password" required>
-        <p class="field-hint" id="password-hint" hidden>Ít nhất 8 ký tự. Chỉ bạn biết mật khẩu này.</p>
       </div>
       <p class="form-error" id="login-error" role="alert" hidden></p>
-      <p class="form-ok" id="login-ok" role="status" hidden></p>
-      <button class="button button-ball" type="submit" id="login-submit"><span class="button-label" id="login-label">Đăng nhập</span></button>
-      <p class="login-switch">
-        <span id="switch-text">Lần đầu vào trang quản trị?</span>
-        <button type="button" class="link-button" id="switch-mode">Tạo mật khẩu</button>
-      </p>
+      <button class="button button-ball" type="submit" id="login-submit"><span class="button-label">Đăng nhập</span></button>
     </form>
 
     <div class="dash" id="dash" hidden>
@@ -77,19 +71,20 @@
       <p class="form-error" id="dash-error" role="alert" hidden></p>
       <div class="groups" id="groups"></div>
 
-      <section class="group admins" aria-labelledby="admins-title">
-        <div class="group-head">
-          <h2 id="admins-title">Người quản trị</h2>
-          <span id="admins-count"></span>
-        </div>
-        <ul class="admin-list" id="admin-list"></ul>
-        <form class="admin-add" id="admin-add" novalidate>
-          <label for="new-admin">Cấp quyền cho email</label>
-          <div class="inline-field">
-            <input id="new-admin" type="email" autocomplete="off" placeholder="dongnghiep@congty.vn">
-            <button class="button button-quiet" type="submit">Thêm</button>
+      <section class="group account" aria-labelledby="account-title">
+        <div class="group-head"><h2 id="account-title">Đổi mật khẩu</h2></div>
+        <form class="password-form" id="password-form" novalidate>
+          <div class="field">
+            <label for="new-password">Mật khẩu mới</label>
+            <input id="new-password" type="password" autocomplete="new-password">
           </div>
-          <p class="field-hint">Người được thêm mở trang này → <b>Tạo mật khẩu</b> bằng đúng email đó → bấm link xác nhận trong email → đăng nhập.</p>
+          <div class="field">
+            <label for="confirm-password">Nhập lại mật khẩu mới</label>
+            <input id="confirm-password" type="password" autocomplete="new-password">
+          </div>
+          <button class="button button-quiet" type="submit" id="password-submit">Lưu mật khẩu</button>
+          <p class="form-ok" id="password-ok" role="status" hidden>Đã đổi mật khẩu. Lần sau đăng nhập bằng mật khẩu mới.</p>
+          <p class="field-error" id="password-error" role="alert" hidden></p>
         </form>
       </section>
     </div>

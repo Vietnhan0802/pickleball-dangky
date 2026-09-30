@@ -32,20 +32,20 @@ export function validatePhone(phone) {
   return null;
 }
 
-const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const ADMIN_DOMAIN = 'pickleball.local';
 const PASSWORD_MIN = 8;
 
-/** @param {string} email @returns {string | null} */
-export function validateEmail(email) {
-  const value = String(email ?? '').trim();
-  if (!value) return 'Nhập email.';
-  if (!EMAIL_PATTERN.test(value) || value.length > 254) return errorMessage('INVALID_EMAIL');
-  return null;
+/** Tên đăng nhập "admin" → tài khoản nội bộ admin@pickleball.local của Supabase. */
+export function loginEmail(username) {
+  const value = String(username ?? '').trim().toLowerCase();
+  return value ? `${value}@${ADMIN_DOMAIN}` : '';
 }
 
-/** @param {string} password @returns {string | null} */
-export function validatePassword(password) {
-  return String(password ?? '').length < PASSWORD_MIN ? errorMessage('WEAK_PASSWORD') : null;
+/** @param {string} password @param {string} confirm @returns {string | null} */
+export function validatePassword(password, confirm) {
+  if (String(password ?? '').length < PASSWORD_MIN) return errorMessage('WEAK_PASSWORD');
+  if (password !== confirm) return 'Hai mật khẩu không khớp.';
+  return null;
 }
 
 /**
@@ -112,12 +112,8 @@ const ERRORS = {
   INVALID_COURSE: 'Khóa học không tồn tại.',
   NOT_FOUND: 'Không tìm thấy đăng ký với số điện thoại này.',
   FORBIDDEN: 'Tài khoản này không có quyền quản trị.',
-  BAD_LOGIN: 'Sai email hoặc mật khẩu, hoặc email chưa được xác nhận.',
-  INVALID_EMAIL: 'Email chưa đúng định dạng.',
+  BAD_LOGIN: 'Sai tên đăng nhập hoặc mật khẩu.',
   WEAK_PASSWORD: 'Mật khẩu cần ít nhất 8 ký tự.',
-  SIGNUP_DISABLED: 'Đang tắt tạo tài khoản mới. Nhờ người quản trị bật lại trong Supabase.',
-  RATE_LIMITED: 'Gửi email quá nhiều lần. Đợi khoảng 1 tiếng rồi thử lại.',
-  CANNOT_REMOVE_SELF: 'Bạn không thể tự gỡ quyền của chính mình.',
   SESSION_EXPIRED: 'Phiên đăng nhập đã hết hạn, đăng nhập lại nhé.',
   NETWORK: 'Mất kết nối. Kiểm tra mạng rồi thử lại.',
 };

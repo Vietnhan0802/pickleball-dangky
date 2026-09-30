@@ -66,7 +66,7 @@ test('waitlist and lookup; an admin delete promotes the first person waiting', a
 
   assert.equal(w.waitlist_position, 1);
   assert.equal(await api.lookup('0999999999'), null);
-  await api.signIn('admin@demo.vn', 'demo');
+  await api.signIn('admin@pickleball.local', 'demo');
   const seat = (await api.adminList()).find((r) => r.phone === phone(500));
   assert.deepEqual(await api.adminDelete(seat.id), { ok: true });
   assert.deepEqual(await api.lookup(phone(1)), {
@@ -83,7 +83,7 @@ test('admin actions require sign-in and keep the rules', async () => {
   await assert.rejects(api.adminList(), (e) => e.code === 'FORBIDDEN');
   await assert.rejects(api.signIn('x', 'y'), (e) => e.code === 'BAD_LOGIN');
   await api.signIn(api.demoAdmin.email, api.demoAdmin.password);
-  assert.deepEqual(api.currentAdmin(), { email: 'admin@demo.vn' });
+  assert.deepEqual(api.currentAdmin(), { email: 'admin@pickleball.local' });
 
   await fill(api, 4, 12);
   await fill(api, 5, 11);
@@ -118,19 +118,14 @@ test('admin actions require sign-in and keep the rules', async () => {
   assert.deepEqual((await api.getStatus()).courses.map((c) => c.taken), [11, 4]);
 });
 
-test('sign-up validates input and admins manage the admin list', async () => {
+test('the demo admin can change its password', async () => {
   const { api } = setup();
-  await assert.rejects(api.signUp('sai', '12345678'), (e) => e.code === 'INVALID_EMAIL');
-  await assert.rejects(api.signUp('linh@congty.vn', '123'), (e) => e.code === 'WEAK_PASSWORD');
-  assert.deepEqual(await api.signUp('linh@congty.vn', '12345678'), { ok: true });
+  await assert.rejects(api.changePassword('matkhaumoi1'), (e) => e.code === 'FORBIDDEN');
+  await api.signIn('admin@pickleball.local', 'demo');
 
-  await assert.rejects(api.adminAdmins(), (e) => e.code === 'FORBIDDEN');
-  await api.signIn('admin@demo.vn', 'demo');
-  assert.deepEqual(await api.adminAddAdmin(' Linh@CongTy.vn '), { ok: true });
-  assert.deepEqual(await api.adminAddAdmin('linh@congty.vn'), { ok: true });
-  assert.deepEqual(await api.adminAdmins(), ['admin@demo.vn', 'linh@congty.vn']);
-  await assert.rejects(api.adminAddAdmin('khong-hop-le'), (e) => e.code === 'INVALID_EMAIL');
-  await assert.rejects(api.adminRemoveAdmin('admin@demo.vn'), (e) => e.code === 'CANNOT_REMOVE_SELF');
-  assert.deepEqual(await api.adminRemoveAdmin('linh@congty.vn'), { ok: true });
-  await assert.rejects(api.adminRemoveAdmin('linh@congty.vn'), (e) => e.code === 'NOT_FOUND');
+  await assert.rejects(api.changePassword('ngan'), (e) => e.code === 'WEAK_PASSWORD');
+  assert.deepEqual(await api.changePassword('matkhaumoi1'), { ok: true });
+  await api.signOut();
+  await assert.rejects(api.signIn('admin@pickleball.local', 'demo'), (e) => e.code === 'BAD_LOGIN');
+  await api.signIn('admin@pickleball.local', 'matkhaumoi1');
 });

@@ -11,8 +11,8 @@ import {
   maskPhone,
   errorMessage,
   toCsv,
-  validateEmail,
   validatePassword,
+  loginEmail,
 } from '../js/logic.js';
 
 const status = (taken4, taken5, extra = {}) => ({
@@ -104,10 +104,13 @@ test('toCsv escapes quotes, commas and starts with a BOM for Excel', () => {
   assert.ok(lines[2].includes('Danh sách chờ'));
 });
 
-test('validateEmail and validatePassword guard the admin sign-up form', () => {
-  assert.equal(validateEmail(' linh@congty.vn '), null);
-  assert.match(validateEmail(''), /Nhập email/);
-  assert.match(validateEmail('linh@congty'), /định dạng/);
-  assert.equal(validatePassword('12345678'), null);
-  assert.match(validatePassword('1234567'), /8 ký tự/);
+test('loginEmail maps the admin username to its internal account', () => {
+  assert.equal(loginEmail(' Admin '), 'admin@pickleball.local');
+  assert.equal(loginEmail(''), '');
+});
+
+test('validatePassword requires 8+ characters and a matching confirmation', () => {
+  assert.equal(validatePassword('12345678', '12345678'), null);
+  assert.match(validatePassword('1234567', '1234567'), /8 ký tự/);
+  assert.match(validatePassword('12345678', '12345679'), /không khớp/);
 });

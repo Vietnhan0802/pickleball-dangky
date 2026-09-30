@@ -45,6 +45,8 @@ on conflict (id) do nothing;
 
 insert into public.settings (id) values (true) on conflict (id) do nothing;
 
+insert into public.admins (email) values ('admin@pickleball.local') on conflict do nothing;
+
 -- Không ai được đọc/ghi bảng trực tiếp; mọi thao tác đi qua các hàm bên dưới.
 alter table public.courses       enable row level security;
 alter table public.registrations enable row level security;
@@ -266,40 +268,10 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
-create or replace function public.admin_admins()
-returns jsonb language plpgsql stable security definer set search_path = public as $$
-begin
-  if not _is_admin() then raise exception 'FORBIDDEN' using errcode = 'P0001'; end if;
-  return (select coalesce(jsonb_agg(email order by email), '[]'::jsonb) from admins);
-end $$;
-
-create or replace function public.admin_add_admin(p_email text)
-returns jsonb language plpgsql security definer set search_path = public as $$
-declare
-  v_email text := lower(btrim(coalesce(p_email, '')));
-begin
-  if not _is_admin() then raise exception 'FORBIDDEN' using errcode = 'P0001'; end if;
-  if v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' or char_length(v_email) > 254 then
-    raise exception 'INVALID_EMAIL' using errcode = 'P0001';
-  end if;
-  insert into admins (email) values (v_email) on conflict do nothing;
-  return jsonb_build_object('ok', true);
-end $$;
-
-create or replace function public.admin_remove_admin(p_email text)
-returns jsonb language plpgsql security definer set search_path = public as $$
-declare
-  v_email text := lower(btrim(coalesce(p_email, '')));
-begin
-  if not _is_admin() then raise exception 'FORBIDDEN' using errcode = 'P0001'; end if;
-  -- Không tự xóa mình, để luôn còn ít nhất 1 người quản trị.
-  if v_email = lower(coalesce(auth.jwt() ->> 'email', '')) then
-    raise exception 'CANNOT_REMOVE_SELF' using errcode = 'P0001';
-  end if;
-  delete from admins where lower(email) = v_email;
-  if not found then raise exception 'NOT_FOUND' using errcode = 'P0001'; end if;
-  return jsonb_build_object('ok', true);
-end $$;
+-- Chỉ có 1 tài khoản admin (tên đăng nhập "admin"), không cấp quyền qua giao diện.
+drop function if exists public.admin_admins();
+drop function if exists public.admin_add_admin(text);
+drop function if exists public.admin_remove_admin(text);
 
 -- ─── Quyền ───────────────────────────────────────────────────────────────
 
@@ -311,6 +283,3 @@ grant execute on function public.admin_list()                    to authenticate
 grant execute on function public.admin_move(bigint, int)         to authenticated;
 grant execute on function public.admin_delete(bigint)            to authenticated;
 grant execute on function public.admin_settings(boolean, boolean) to authenticated;
-grant execute on function public.admin_admins()                  to authenticated;
-grant execute on function public.admin_add_admin(text)           to authenticated;
-grant execute on function public.admin_remove_admin(text)        to authenticated;
