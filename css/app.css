@@ -193,8 +193,6 @@
 .ticket-facts div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 12px 16px; background: var(--surface); }
 .ticket-facts dt { color: var(--ink-3); font-size: 0.875rem; }
 .ticket-facts dd { margin: 0; font-weight: 700; text-align: right; }
-.ticket-code { background: var(--surface-2) !important; }
-.ticket-code dd { font-size: 1.75rem; letter-spacing: 0.18em; font-variant-numeric: tabular-nums; color: var(--court-deep); }
 .ticket-note { margin: 12px 0 0; font-size: 0.875rem; color: var(--ink-3); }
 
 /* Tra cứu / hủy */
@@ -206,16 +204,15 @@
 .lookup summary::-webkit-details-marker { display: none; }
 .lookup summary svg { transition: transform 200ms var(--ease-out); }
 .lookup[open] summary svg { transform: rotate(180deg); }
-.lookup-form, .cancel-form { margin-top: 10px; }
+.lookup-form { margin-top: 10px; }
 .inline-field { display: flex; gap: 8px; }
 .inline-field input { flex: 1; min-width: 0; }
 .inline-field .button { flex: none; }
 .lookup-result { margin-top: 14px; padding: 14px 16px; background: var(--surface-2); border-radius: var(--radius-sm); }
 .lookup-result strong { display: block; font-size: 1.0625rem; }
 .lookup-result p { margin: 2px 0 0; color: var(--ink-2); }
+.lookup-result p + p { margin-top: 6px; font-size: 0.875rem; color: var(--ink-3); }
 .lookup-result.is-ok { background: var(--ok-soft); }
-.cancel-form { margin-top: 16px; }
-.cancel-form #cancel-code { letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
 
 /* ─── Danh sách ─── */
 .roster { margin-top: 48px; }

@@ -52,13 +52,13 @@ const fill = async (course, count, offset = 0) => {
 const asAdmin = (email = 'boss@congty.vn') =>
   db.exec(`select set_config('request.jwt.claims', '{"email":"${email}"}', false)`);
 
-test('registers a person into the chosen course and returns a 4-digit cancel code', async () => {
+test('registers a person into the chosen course', async () => {
   const result = await call('register', '  Nguyễn   Văn A ', '0901 234 567', 4);
 
   assert.equal(result.status, 'registered');
   assert.equal(result.course_id, 4);
   assert.equal(result.seat, 1);
-  assert.match(result.cancel_code, /^\d{4}$/);
+  assert.equal(result.cancel_code, undefined);
 
   const status = await call('get_status');
   assert.deepEqual(status.courses[0].members, ['Nguyễn Văn A']);
@@ -96,7 +96,7 @@ test('fill_in_order keeps course 5 closed until course 4 is full', async () => {
   assert.equal(ok.course_id, 5);
 });
 
-test('waitlist only opens when both courses are full, and cancelling promotes the first in line', async () => {
+test('waitlist only opens when both courses are full, and a freed seat goes to the first in line', async () => {
   assert.equal(await errorOf(call('register', 'Chờ 1', phone(1), null)), 'SEATS_AVAILABLE');
   await fill(4, 12);
   await fill(5, 12);
@@ -106,9 +106,10 @@ test('waitlist only opens when both courses are full, and cancelling promotes th
   assert.equal(w1.status, 'waitlist');
   assert.equal(w2.waitlist_position, 2);
 
-  const firstInCourse5 = phone(500);
-  const code = (await db.query('select cancel_code from registrations where phone = $1', [firstInCourse5])).rows[0].cancel_code;
-  assert.deepEqual(await call('cancel', firstInCourse5, code), { ok: true });
+  await db.exec("insert into admins values ('boss@congty.vn')");
+  await asAdmin();
+  const firstInCourse5 = (await call('admin_list')).find((r) => r.phone === phone(500));
+  assert.deepEqual(await call('admin_delete', firstInCourse5.id), { ok: true });
 
   const promoted = await call('lookup', phone(1));
   assert.equal(promoted.status, 'registered');
@@ -125,17 +126,13 @@ test('lookup returns null for unknown phones and seat order for known ones', asy
   assert.equal(third.full_name, 'Người 4-2');
 });
 
-test('cancel with a wrong code counts attempts and locks after 5 tries', async () => {
+test('the public cannot cancel or delete anyone', async () => {
   await call('register', 'Phạm D', '0911111111', 4);
-  const real = (await db.query("select cancel_code from registrations")).rows[0].cancel_code;
-  const wrong = real === '0000' ? '1111' : '0000';
 
-  const first = await call('cancel', '0911111111', wrong);
-  assert.deepEqual(first, { ok: false, error: 'WRONG_CODE', attempts_left: 4 });
-  for (let i = 0; i < 4; i++) await call('cancel', '0911111111', wrong);
-
-  assert.equal(await errorOf(call('cancel', '0911111111', real)), 'TOO_MANY_ATTEMPTS');
-  assert.equal(await errorOf(call('cancel', '0900000000', real)), 'NOT_FOUND');
+  const { rows } = await db.query("select count(*)::int as n from pg_proc where proname = 'cancel'");
+  assert.equal(rows[0].n, 0);
+  assert.equal(await errorOf(call('admin_delete', 1)), 'FORBIDDEN');
+  assert.equal(await errorOf(call('admin_move', 1, 5)), 'FORBIDDEN');
 });
 
 test('closing registration blocks new sign-ups', async () => {
@@ -180,4 +177,26 @@ test('admin can list, move, delete and change settings; deleting promotes the wa
   const after = await call('get_status');
   assert.equal(after.is_open, false);
   assert.equal(after.fill_in_order, true);
+});
+
+test('admins can add and remove other admins but never themselves', async () => {
+  await db.exec("insert into admins values ('boss@congty.vn')");
+  await asAdmin('boss@congty.vn');
+
+  assert.deepEqual(await call('admin_add_admin', '  Linh.Tran@CongTy.vn '), { ok: true });
+  assert.deepEqual(await call('admin_add_admin', 'linh.tran@congty.vn'), { ok: true });
+  assert.deepEqual(await call('admin_admins'), ['boss@congty.vn', 'linh.tran@congty.vn']);
+  assert.equal(await errorOf(call('admin_add_admin', 'khong-phai-email')), 'INVALID_EMAIL');
+  assert.equal(await errorOf(call('admin_remove_admin', 'BOSS@congty.vn')), 'CANNOT_REMOVE_SELF');
+
+  // Admin mới đăng nhập được quyền ngay.
+  await asAdmin('linh.tran@congty.vn');
+  assert.deepEqual(await call('admin_list'), []);
+  await asAdmin('boss@congty.vn');
+  assert.deepEqual(await call('admin_remove_admin', 'linh.tran@congty.vn'), { ok: true });
+  assert.equal(await errorOf(call('admin_remove_admin', 'ai-do@x.vn')), 'NOT_FOUND');
+
+  await asAdmin('linh.tran@congty.vn');
+  assert.equal(await errorOf(call('admin_admins')), 'FORBIDDEN');
+  assert.equal(await errorOf(call('admin_add_admin', 'hacker@x.vn')), 'FORBIDDEN');
 });

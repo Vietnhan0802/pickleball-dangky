@@ -17,8 +17,7 @@ const el = {
   formTitle: $('form-title'), formSub: $('form-sub'), submit: $('submit'), submitLabel: $('submit-label'),
   notice: $('notice'), ticket: $('ticket'), roster: $('roster'),
   lookupForm: $('lookup-form'), lookupPhone: $('lookup-phone'), lookupResult: $('lookup-result'),
-  lookupError: $('lookup-error'), cancelForm: $('cancel-form'), cancelCode: $('cancel-code'),
-  cancelSubmit: $('cancel-submit'), lookup: $('lookup'),
+  lookupError: $('lookup-error'), lookup: $('lookup'),
 };
 
 let status = null;
@@ -237,7 +236,7 @@ el.signup.addEventListener('submit', async (event) => {
   try {
     const result = await api.register(cleanName(el.name.value), el.phone.value, courseId);
     const name = cleanName(el.name.value);
-    writeMine({ name, phone: normalizePhone(el.phone.value), course_id: result.course_id, code: result.cancel_code });
+    writeMine({ name, phone: normalizePhone(el.phone.value), course_id: result.course_id });
     justLanded = result.course_id ? { course_id: result.course_id, seat: result.seat } : null;
     showTicket({ ...result, full_name: name });
     await refresh();
@@ -264,15 +263,12 @@ function showTicket(result) {
   $('ticket-name').textContent = result.full_name;
   $('ticket-slot-label').textContent = waiting ? 'Thứ tự chờ' : 'Chỗ số';
   $('ticket-slot').textContent = waiting ? `#${result.waitlist_position}` : `${result.seat} / 12`;
-  $('ticket-code').textContent = result.cancel_code ?? mine?.code ?? '—';
   el.ticket.hidden = false;
   el.signup.hidden = true;
   el.ticket.focus({ preventScroll: true });
 }
 
-// ─── Tra cứu / hủy ───────────────────────────────────────────────────────
-
-let lookedUpPhone = null;
+// ─── Tra cứu ───────────────────────────────────────────────────────
 
 function showLookupError(message) {
   el.lookupError.textContent = message ?? '';
@@ -288,66 +284,23 @@ el.lookupForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   showLookupError(null);
   el.lookupResult.hidden = true;
-  el.cancelForm.hidden = true;
   const error = validatePhone(el.lookupPhone.value);
   if (error) return showLookupError(error);
 
   try {
     const result = await api.lookup(el.lookupPhone.value);
     if (!result) return showLookupError(errorMessage('NOT_FOUND'));
-    lookedUpPhone = normalizePhone(el.lookupPhone.value);
     el.lookupResult.className = 'lookup-result is-ok';
-    el.lookupResult.replaceChildren(h('strong', {}, result.full_name), h('p', {}, describe(result)));
+    el.lookupResult.replaceChildren(
+      h('strong', {}, result.full_name),
+      h('p', {}, describe(result)),
+      h('p', {}, 'Muốn hủy hoặc đổi khóa, nhắn người quản trị nhé.'),
+    );
     el.lookupResult.hidden = false;
-    el.cancelForm.hidden = false;
-    if (mine?.phone === lookedUpPhone) el.cancelCode.value = mine.code;
   } catch (err) {
     showLookupError(errorMessage(err.code));
   }
 });
-
-let confirmTimer = null;
-
-el.cancelForm.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  showLookupError(null);
-  if (!/^\d{4}$/.test(el.cancelCode.value.trim())) return showLookupError('Mã hủy gồm 4 chữ số.');
-
-  // Bấm 2 lần để xác nhận, tránh hủy nhầm.
-  if (!el.cancelSubmit.dataset.confirm) {
-    el.cancelSubmit.dataset.confirm = '1';
-    el.cancelSubmit.textContent = 'Bấm lần nữa để hủy';
-    clearTimeout(confirmTimer);
-    confirmTimer = setTimeout(resetCancelButton, 4000);
-    return;
-  }
-  resetCancelButton();
-  el.cancelSubmit.disabled = true;
-  try {
-    const result = await api.cancel(lookedUpPhone, el.cancelCode.value);
-    if (!result.ok) {
-      return showLookupError(`${errorMessage(result.error)} Còn ${result.attempts_left} lần thử.`);
-    }
-    if (mine?.phone === lookedUpPhone) writeMine(null);
-    el.cancelForm.hidden = true;
-    el.cancelCode.value = '';
-    el.lookupResult.className = 'lookup-result';
-    el.lookupResult.replaceChildren(h('strong', {}, 'Đã hủy chỗ'), h('p', {}, 'Cảm ơn bạn đã nhường chỗ cho người khác.'));
-    el.ticket.hidden = true;
-    justLanded = null;
-    await refresh();
-  } catch (err) {
-    showLookupError(errorMessage(err.code));
-  } finally {
-    el.cancelSubmit.disabled = false;
-  }
-});
-
-function resetCancelButton() {
-  clearTimeout(confirmTimer);
-  delete el.cancelSubmit.dataset.confirm;
-  el.cancelSubmit.textContent = 'Hủy chỗ';
-}
 
 // ─── Danh sách ───────────────────────────────────────────────────────────
 
@@ -401,7 +354,7 @@ async function restoreMine() {
     const result = await api.lookup(mine.phone);
     if (!result) return writeMine(null);
     writeMine({ ...mine, course_id: result.course_id });
-    showTicket({ ...result, cancel_code: mine.code });
+    showTicket(result);
   } catch {
     // Offline: vẫn hiện form, lần refresh sau sẽ thử lại.
   }

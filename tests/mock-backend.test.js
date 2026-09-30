@@ -10,7 +10,6 @@ const setup = (state = empty()) => {
   const api = createMockBackend({
     load: () => state,
     save: (s) => { saved = s; },
-    random: () => 0.1234,
     now: () => new Date((clock += 1000)),
   });
   return { api, saved: () => saved };
@@ -36,7 +35,7 @@ test('register persists, returns seat and code, and rejects duplicates by phone'
 
   const result = await api.register(' Ngô  An ', '+84 901 234 567', 4);
 
-  assert.deepEqual(result, { status: 'registered', course_id: 4, seat: 1, waitlist_position: null, cancel_code: '1234' });
+  assert.deepEqual(result, { status: 'registered', course_id: 4, seat: 1, waitlist_position: null });
   assert.equal(saved().rows[0].full_name, 'Ngô An');
   await assert.rejects(api.register('Ngô An', '0901234567', 5), (e) => codeOf(e) === 'ALREADY_REGISTERED');
 });
@@ -58,7 +57,7 @@ test('register validates input, capacity, order and open state', async () => {
   await assert.rejects(closed.register('An', phone(1), 4), (e) => e.code === 'CLOSED');
 });
 
-test('waitlist, lookup and cancel promote the first person waiting', async () => {
+test('waitlist and lookup; an admin delete promotes the first person waiting', async () => {
   const { api } = setup();
   await fill(api, 4, 12);
   await fill(api, 5, 12);
@@ -67,22 +66,16 @@ test('waitlist, lookup and cancel promote the first person waiting', async () =>
 
   assert.equal(w.waitlist_position, 1);
   assert.equal(await api.lookup('0999999999'), null);
-  assert.deepEqual(await api.cancel(phone(500), '0000'), { ok: false, error: 'WRONG_CODE', attempts_left: 4 });
-  assert.deepEqual(await api.cancel(phone(500), '1234'), { ok: true });
+  await api.signIn('admin@demo.vn', 'demo');
+  const seat = (await api.adminList()).find((r) => r.phone === phone(500));
+  assert.deepEqual(await api.adminDelete(seat.id), { ok: true });
   assert.deepEqual(await api.lookup(phone(1)), {
     full_name: 'Chờ Một', status: 'registered', course_id: 5, seat: 12, waitlist_position: null,
   });
   assert.equal((await api.lookup(phone(2))).waitlist_position, 1);
-  await assert.rejects(api.cancel('0999999999', '1'), (e) => e.code === 'NOT_FOUND');
-  assert.deepEqual(await api.cancel(phone(2), '1234'), { ok: true });
-});
-
-test('cancel locks after five wrong codes', async () => {
-  const { api } = setup();
-  await api.register('Phạm D', phone(1), 4);
-  for (let i = 0; i < 5; i++) await api.cancel(phone(1), '9999');
-
-  await assert.rejects(api.cancel(phone(1), '1234'), (e) => e.code === 'TOO_MANY_ATTEMPTS');
+  const waiting = (await api.adminList()).find((r) => r.phone === phone(2));
+  assert.deepEqual(await api.adminDelete(waiting.id), { ok: true });
+  assert.equal(api.cancel, undefined);
 });
 
 test('admin actions require sign-in and keep the rules', async () => {
@@ -90,7 +83,7 @@ test('admin actions require sign-in and keep the rules', async () => {
   await assert.rejects(api.adminList(), (e) => e.code === 'FORBIDDEN');
   await assert.rejects(api.signIn('x', 'y'), (e) => e.code === 'BAD_LOGIN');
   await api.signIn(api.demoAdmin.email, api.demoAdmin.password);
-  assert.deepEqual(api.currentAdmin(), { email: 'admin@demo' });
+  assert.deepEqual(api.currentAdmin(), { email: 'admin@demo.vn' });
 
   await fill(api, 4, 12);
   await fill(api, 5, 11);
@@ -123,4 +116,21 @@ test('admin actions require sign-in and keep the rules', async () => {
   await api.signOut();
   assert.equal(api.currentAdmin(), null);
   assert.deepEqual((await api.getStatus()).courses.map((c) => c.taken), [11, 4]);
+});
+
+test('sign-up validates input and admins manage the admin list', async () => {
+  const { api } = setup();
+  await assert.rejects(api.signUp('sai', '12345678'), (e) => e.code === 'INVALID_EMAIL');
+  await assert.rejects(api.signUp('linh@congty.vn', '123'), (e) => e.code === 'WEAK_PASSWORD');
+  assert.deepEqual(await api.signUp('linh@congty.vn', '12345678'), { ok: true });
+
+  await assert.rejects(api.adminAdmins(), (e) => e.code === 'FORBIDDEN');
+  await api.signIn('admin@demo.vn', 'demo');
+  assert.deepEqual(await api.adminAddAdmin(' Linh@CongTy.vn '), { ok: true });
+  assert.deepEqual(await api.adminAddAdmin('linh@congty.vn'), { ok: true });
+  assert.deepEqual(await api.adminAdmins(), ['admin@demo.vn', 'linh@congty.vn']);
+  await assert.rejects(api.adminAddAdmin('khong-hop-le'), (e) => e.code === 'INVALID_EMAIL');
+  await assert.rejects(api.adminRemoveAdmin('admin@demo.vn'), (e) => e.code === 'CANNOT_REMOVE_SELF');
+  assert.deepEqual(await api.adminRemoveAdmin('linh@congty.vn'), { ok: true });
+  await assert.rejects(api.adminRemoveAdmin('linh@congty.vn'), (e) => e.code === 'NOT_FOUND');
 });

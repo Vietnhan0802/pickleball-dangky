@@ -2,7 +2,7 @@
 // Mô phỏng đúng các luật trong supabase/schema.sql để xem thử giao diện.
 import { normalizePhone, cleanName } from './logic.js';
 
-const DEMO_ADMIN = { email: 'admin@demo', password: 'demo' };
+const DEMO_ADMIN = { email: 'admin@demo.vn', password: 'demo' };
 
 export class BackendError extends Error {
   /** @param {string} code */
@@ -27,8 +27,6 @@ export function sampleState() {
     phone: `09${String(10000000 + i * 7919).slice(0, 8)}`,
     course_id: i < 11 ? 4 : 5,
     status: 'registered',
-    cancel_code: String(1000 + i),
-    cancel_attempts: 0,
     created_at: new Date(start + i * 600000).toISOString(),
   }));
   return {
@@ -39,6 +37,7 @@ export function sampleState() {
       { id: 5, name: 'Khóa 5', capacity: 12, schedule: '' },
     ],
     rows,
+    admins: [DEMO_ADMIN.email],
   };
 }
 
@@ -46,7 +45,6 @@ export function sampleState() {
  * @param {{ load?: () => any, save?: (state: any) => void, random?: () => number, now?: () => Date }} [io]
  */
 export function createMockBackend(io = {}) {
-  const random = io.random ?? Math.random;
   const now = io.now ?? (() => new Date());
   let state = io.load?.() ?? sampleState();
   let session = null;
@@ -123,8 +121,6 @@ export function createMockBackend(io = {}) {
         phone: p,
         course_id: status === 'registered' ? courseId : null,
         status,
-        cancel_code: String(Math.floor(random() * 10000)).padStart(4, '0'),
-        cancel_attempts: 0,
         created_at: now().toISOString(),
       };
       commit({ ...state, nextId: state.nextId + 1, rows: [...state.rows, row] });
@@ -133,7 +129,6 @@ export function createMockBackend(io = {}) {
         course_id: row.course_id,
         seat: status === 'registered' ? position(row) : null,
         waitlist_position: status === 'waitlist' ? position(row) : null,
-        cancel_code: row.cancel_code,
       };
     },
 
@@ -149,23 +144,16 @@ export function createMockBackend(io = {}) {
       };
     },
 
-    async cancel(phone, code) {
-      const row = state.rows.find((r) => r.phone === normalizePhone(phone));
-      if (!row) throw new BackendError('NOT_FOUND');
-      if (row.cancel_attempts >= 5) throw new BackendError('TOO_MANY_ATTEMPTS');
-      if (row.cancel_code !== String(code ?? '').trim()) {
-        commit({ ...state, rows: state.rows.map((r) => (r.id === row.id ? { ...r, cancel_attempts: r.cancel_attempts + 1 } : r)) });
-        return { ok: false, error: 'WRONG_CODE', attempts_left: 4 - row.cancel_attempts };
-      }
-      const rest = state.rows.filter((r) => r.id !== row.id);
-      commit({ ...state, rows: row.course_id ? promote(rest, row.course_id) : rest });
-      return { ok: true };
-    },
-
     async signIn(email, password) {
       if (email !== DEMO_ADMIN.email || password !== DEMO_ADMIN.password) throw new BackendError('BAD_LOGIN');
       session = { email };
       return session;
+    },
+
+    async signUp(email, password) {
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(email ?? '').trim())) throw new BackendError('INVALID_EMAIL');
+      if (String(password ?? '').length < 8) throw new BackendError('WEAK_PASSWORD');
+      return { ok: true };
     },
 
     async signOut() {
@@ -213,6 +201,30 @@ export function createMockBackend(io = {}) {
           fill_in_order: fillInOrder ?? state.settings.fill_in_order,
         },
       });
+      return { ok: true };
+    },
+
+    async adminAdmins() {
+      requireAdmin();
+      return [...(state.admins ?? [])].sort();
+    },
+
+    async adminAddAdmin(email) {
+      requireAdmin();
+      const value = String(email ?? '').trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)) throw new BackendError('INVALID_EMAIL');
+      const admins = state.admins ?? [];
+      if (!admins.includes(value)) commit({ ...state, admins: [...admins, value] });
+      return { ok: true };
+    },
+
+    async adminRemoveAdmin(email) {
+      requireAdmin();
+      const value = String(email ?? '').trim().toLowerCase();
+      if (value === session.email) throw new BackendError('CANNOT_REMOVE_SELF');
+      const admins = state.admins ?? [];
+      if (!admins.includes(value)) throw new BackendError('NOT_FOUND');
+      commit({ ...state, admins: admins.filter((a) => a !== value) });
       return { ok: true };
     },
 

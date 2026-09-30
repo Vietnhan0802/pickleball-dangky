@@ -71,14 +71,13 @@
           <dl class="ticket-facts">
             <div><dt>Người đăng ký</dt><dd id="ticket-name"></dd></div>
             <div><dt id="ticket-slot-label">Vị trí</dt><dd id="ticket-slot"></dd></div>
-            <div class="ticket-code"><dt>Mã hủy chỗ</dt><dd id="ticket-code"></dd></div>
           </dl>
-          <p class="ticket-note">Chụp màn hình lại mã hủy. Bạn cần mã này nếu muốn tự hủy để nhường chỗ.</p>
+          <p class="ticket-note">Muốn hủy hoặc đổi khóa? Nhắn người quản trị để được xử lý.</p>
         </div>
 
         <details class="lookup" id="lookup">
           <summary>
-            <span>Đã đăng ký? Tra cứu hoặc hủy chỗ</span>
+            <span>Đã đăng ký? Tra cứu chỗ của bạn</span>
             <svg aria-hidden="true"><use href="assets/icons.svg#chevron"></use></svg>
           </summary>
           <form class="lookup-form" id="lookup-form" novalidate>
@@ -89,14 +88,6 @@
             </div>
           </form>
           <div class="lookup-result" id="lookup-result" hidden></div>
-          <form class="cancel-form" id="cancel-form" novalidate hidden>
-            <label for="cancel-code">Mã hủy 4 số</label>
-            <div class="inline-field">
-              <input id="cancel-code" inputmode="numeric" autocomplete="one-time-code" maxlength="4" pattern="\d{4}" placeholder="••••">
-              <button class="button button-danger" type="submit" id="cancel-submit">Hủy chỗ</button>
-            </div>
-            <p class="field-hint">Quên mã? Nhắn người tổ chức để được hủy giúp.</p>
-          </form>
           <p class="form-error" id="lookup-error" role="alert" hidden></p>
         </details>
       </section>

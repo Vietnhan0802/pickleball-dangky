@@ -17,13 +17,14 @@ create table if not exists public.registrations (
   phone       text        not null unique check (phone ~ '^0[0-9]{9}$'),
   course_id   int         references public.courses(id),
   status      text        not null check (status in ('registered', 'waitlist')),
-  cancel_code text        not null,
-  cancel_attempts int     not null default 0,
   created_at  timestamptz not null default now(),
   check ((status = 'registered') = (course_id is not null))
 );
 
-alter table public.registrations add column if not exists cancel_attempts int not null default 0;
+-- Bỏ tính năng tự hủy: chỉ admin được xóa hoặc chuyển chỗ.
+drop function if exists public.cancel(text, text);
+alter table public.registrations drop column if exists cancel_code;
+alter table public.registrations drop column if exists cancel_attempts;
 
 create index if not exists registrations_course_idx on public.registrations (course_id, created_at);
 
@@ -136,7 +137,6 @@ returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v_phone  text := _normalize_phone(p_phone);
   v_name   text := regexp_replace(btrim(coalesce(p_name, '')), '\s+', ' ', 'g');
-  v_code   text := lpad((floor(random() * 10000))::int::text, 4, '0');
   v_status text;
   v_course int;
   v_s      settings;
@@ -180,8 +180,8 @@ begin
     v_course := p_course;
   end if;
 
-  insert into registrations (full_name, phone, course_id, status, cancel_code)
-    values (v_name, v_phone, v_course, v_status, v_code)
+  insert into registrations (full_name, phone, course_id, status)
+    values (v_name, v_phone, v_course, v_status)
     returning * into v_row;
 
   return jsonb_build_object(
@@ -189,8 +189,7 @@ begin
     'course_id', v_row.course_id,
     'seat', case when v_row.course_id is null then null else _taken(v_row.course_id) end,
     'waitlist_position', case when v_row.status = 'waitlist' then
-      (select count(*) from registrations where status = 'waitlist') end,
-    'cancel_code', v_row.cancel_code
+      (select count(*) from registrations where status = 'waitlist') end
   );
 end $$;
 
@@ -212,32 +211,6 @@ returns jsonb language sql stable security definer set search_path = public as $
   from (select 1) one
   left join registrations r on r.phone = _normalize_phone(p_phone)
 $$;
-
-create or replace function public.cancel(p_phone text, p_code text)
-returns jsonb language plpgsql security definer set search_path = public as $$
-declare
-  v_row registrations;
-begin
-  perform _lock();
-  select * into v_row from registrations where phone = _normalize_phone(p_phone);
-  if v_row.id is null then
-    raise exception 'NOT_FOUND' using errcode = 'P0001';
-  end if;
-  if v_row.cancel_attempts >= 5 then
-    raise exception 'TOO_MANY_ATTEMPTS' using errcode = 'P0001';
-  end if;
-  if v_row.cancel_code <> btrim(coalesce(p_code, '')) then
-    -- Trả về lỗi thay vì raise để lượt nhập sai được ghi lại (raise sẽ rollback).
-    update registrations set cancel_attempts = cancel_attempts + 1 where id = v_row.id;
-    return jsonb_build_object('ok', false, 'error', 'WRONG_CODE',
-                              'attempts_left', 4 - v_row.cancel_attempts);
-  end if;
-  delete from registrations where id = v_row.id;
-  if v_row.course_id is not null then
-    perform _promote_waitlist(v_row.course_id);
-  end if;
-  return jsonb_build_object('ok', true);
-end $$;
 
 -- ─── Hàm admin (cần đăng nhập, email nằm trong bảng admins) ─────────────
 
@@ -293,14 +266,51 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
+create or replace function public.admin_admins()
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+begin
+  if not _is_admin() then raise exception 'FORBIDDEN' using errcode = 'P0001'; end if;
+  return (select coalesce(jsonb_agg(email order by email), '[]'::jsonb) from admins);
+end $$;
+
+create or replace function public.admin_add_admin(p_email text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_email text := lower(btrim(coalesce(p_email, '')));
+begin
+  if not _is_admin() then raise exception 'FORBIDDEN' using errcode = 'P0001'; end if;
+  if v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' or char_length(v_email) > 254 then
+    raise exception 'INVALID_EMAIL' using errcode = 'P0001';
+  end if;
+  insert into admins (email) values (v_email) on conflict do nothing;
+  return jsonb_build_object('ok', true);
+end $$;
+
+create or replace function public.admin_remove_admin(p_email text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_email text := lower(btrim(coalesce(p_email, '')));
+begin
+  if not _is_admin() then raise exception 'FORBIDDEN' using errcode = 'P0001'; end if;
+  -- Không tự xóa mình, để luôn còn ít nhất 1 người quản trị.
+  if v_email = lower(coalesce(auth.jwt() ->> 'email', '')) then
+    raise exception 'CANNOT_REMOVE_SELF' using errcode = 'P0001';
+  end if;
+  delete from admins where lower(email) = v_email;
+  if not found then raise exception 'NOT_FOUND' using errcode = 'P0001'; end if;
+  return jsonb_build_object('ok', true);
+end $$;
+
 -- ─── Quyền ───────────────────────────────────────────────────────────────
 
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function public.get_status()                    to anon, authenticated;
 grant execute on function public.register(text, text, int)       to anon, authenticated;
 grant execute on function public.lookup(text)                    to anon, authenticated;
-grant execute on function public.cancel(text, text)              to anon, authenticated;
 grant execute on function public.admin_list()                    to authenticated;
 grant execute on function public.admin_move(bigint, int)         to authenticated;
 grant execute on function public.admin_delete(bigint)            to authenticated;
 grant execute on function public.admin_settings(boolean, boolean) to authenticated;
+grant execute on function public.admin_admins()                  to authenticated;
+grant execute on function public.admin_add_admin(text)           to authenticated;
+grant execute on function public.admin_remove_admin(text)        to authenticated;

@@ -1,5 +1,5 @@
 import { createApi } from './api.js';
-import { errorMessage, formatPhone, toCsv } from './logic.js';
+import { errorMessage, formatPhone, toCsv, validateEmail, validatePassword } from './logic.js';
 
 const api = createApi();
 const $ = (id) => document.getElementById(id);
@@ -7,6 +7,8 @@ const ICONS = 'assets/icons.svg';
 
 let rows = [];
 let status = null;
+let admins = [];
+let mode = 'login';
 
 function h(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -88,14 +90,13 @@ function table(list) {
   return h('table', { class: 'table' },
     h('thead', {}, h('tr', {},
       h('th', {}, '#'), h('th', {}, 'Họ tên'), h('th', {}, 'SĐT'),
-      h('th', {}, 'Đăng ký lúc'), h('th', {}, 'Mã hủy'), h('th', {}, h('span', { class: 'visually-hidden' }, 'Thao tác')),
+      h('th', {}, 'Đăng ký lúc'), h('th', {}, h('span', { class: 'visually-hidden' }, 'Thao tác')),
     )),
     h('tbody', {}, ...list.map((row, i) => h('tr', {},
       h('td', {}, String(i + 1)),
       h('td', { class: 'name' }, row.full_name),
       h('td', { class: 'num' }, h('a', { href: `tel:${row.phone}` }, formatPhone(row.phone))),
       h('td', { class: 'num' }, formatTime(row.created_at)),
-      h('td', { class: 'num' }, row.cancel_code),
       h('td', {}, h('div', { class: 'row-actions' }, moveSelect(row), deleteButton(row))),
     ))),
   );
@@ -127,10 +128,30 @@ function render() {
   );
 }
 
+function renderAdmins() {
+  const me = api.currentAdmin()?.email?.toLowerCase();
+  $('admins-count').textContent = `${admins.length} người`;
+  $('admin-list').replaceChildren(...admins.map((email) => {
+    const isMe = email === me;
+    const remove = isMe ? null : h('button', { type: 'button', class: 'icon-button', 'aria-label': `Gỡ quyền ${email}` }, icon('trash'));
+    remove?.addEventListener('click', () => {
+      if (!remove.classList.contains('is-armed')) {
+        remove.classList.add('is-armed');
+        remove.replaceChildren('Gỡ?');
+        setTimeout(() => { remove.classList.remove('is-armed'); remove.replaceChildren(icon('trash')); }, 4000);
+        return;
+      }
+      guarded(() => api.adminRemoveAdmin(email));
+    });
+    return h('li', {}, h('span', {}, email, isMe ? h('span', { class: 'me' }, 'bạn') : null), remove);
+  }));
+}
+
 async function load() {
   try {
-    [status, rows] = await Promise.all([api.getStatus(), api.adminList()]);
+    [status, rows, admins] = await Promise.all([api.getStatus(), api.adminList(), api.adminAdmins()]);
     render();
+    renderAdmins();
   } catch (err) {
     if (err.code === 'SESSION_EXPIRED' || err.code === 'FORBIDDEN') {
       await api.signOut();
@@ -158,13 +179,56 @@ async function showDash() {
   await load();
 }
 
+const LOGIN_TEXT = {
+  login: {
+    title: 'Đăng nhập quản trị', sub: 'Dùng email đã được cấp quyền quản trị.',
+    button: 'Đăng nhập', switchText: 'Lần đầu vào trang quản trị?', switchButton: 'Tạo mật khẩu',
+  },
+  signup: {
+    title: 'Tạo mật khẩu lần đầu', sub: 'Dùng đúng email đã được người quản trị cấp quyền.',
+    button: 'Tạo tài khoản', switchText: 'Đã có mật khẩu?', switchButton: 'Đăng nhập',
+  },
+};
+
+function setMode(next) {
+  mode = next;
+  const text = LOGIN_TEXT[mode];
+  $('login-title').textContent = text.title;
+  $('login-sub').textContent = text.sub;
+  $('login-label').textContent = text.button;
+  $('switch-text').textContent = text.switchText;
+  $('switch-mode').textContent = text.switchButton;
+  $('password-hint').hidden = mode !== 'signup';
+  $('password').autocomplete = mode === 'signup' ? 'new-password' : 'current-password';
+  $('login-error').hidden = true;
+}
+
+$('switch-mode').addEventListener('click', () => {
+  $('login-ok').hidden = true;
+  setMode(mode === 'login' ? 'signup' : 'login');
+});
+
 $('login').addEventListener('submit', async (event) => {
   event.preventDefault();
+  const email = $('email').value.trim();
+  const password = $('password').value;
+  const invalid = validateEmail(email) ?? (mode === 'signup' ? validatePassword(password) : null);
+  $('login-ok').hidden = true;
+  if (invalid) return showLogin(invalid);
+
   const submit = $('login-submit');
   submit.disabled = true;
   submit.classList.add('is-busy');
   try {
-    await api.signIn($('email').value.trim(), $('password').value);
+    if (mode === 'signup') {
+      await api.signUp(email, password);
+      $('password').value = '';
+      setMode('login');
+      $('login-ok').textContent = `Đã gửi email xác nhận tới ${email}. Bấm link trong email rồi quay lại đây đăng nhập.`;
+      $('login-ok').hidden = false;
+      return;
+    }
+    await api.signIn(email, password);
     $('password').value = '';
     await showDash();
   } catch (err) {
@@ -173,6 +237,17 @@ $('login').addEventListener('submit', async (event) => {
     submit.disabled = false;
     submit.classList.remove('is-busy');
   }
+});
+
+$('admin-add').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const email = $('new-admin').value.trim();
+  const invalid = validateEmail(email);
+  if (invalid) return showError(invalid);
+  guarded(async () => {
+    await api.adminAddAdmin(email);
+    $('new-admin').value = '';
+  });
 });
 
 $('sign-out').addEventListener('click', async () => {

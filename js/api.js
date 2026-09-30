@@ -7,6 +7,17 @@ export { BackendError };
 const DEMO_KEY = 'pickleball-demo-v1';
 const SESSION_KEY = 'pickleball-admin-session';
 
+// Mã lỗi của Supabase Auth → mã lỗi của ứng dụng.
+const AUTH_ERRORS = {
+  weak_password: 'WEAK_PASSWORD',
+  email_address_invalid: 'INVALID_EMAIL',
+  validation_failed: 'INVALID_EMAIL',
+  signup_disabled: 'SIGNUP_DISABLED',
+  email_provider_disabled: 'SIGNUP_DISABLED',
+  over_email_send_rate_limit: 'RATE_LIMITED',
+  over_request_rate_limit: 'RATE_LIMITED',
+};
+
 const storage = {
   get(store, key) {
     try {
@@ -25,9 +36,25 @@ const storage = {
   },
 };
 
+/** Link xác nhận email của Supabase quay về dạng admin.html#access_token=...&type=signup */
+function sessionFromConfirmLink() {
+  const params = new URLSearchParams(location.hash.slice(1));
+  const token = params.get('access_token');
+  if (!token) return null;
+  history.replaceState(null, '', location.pathname + location.search);
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    const session = { access_token: token, user: { email: payload.email } };
+    storage.set(sessionStorage, SESSION_KEY, session);
+    return session;
+  } catch {
+    return null;
+  }
+}
+
 function createSupabaseBackend({ supabaseUrl, supabaseAnonKey }) {
   const base = supabaseUrl.replace(/\/$/, '');
-  let session = storage.get(sessionStorage, SESSION_KEY);
+  let session = sessionFromConfirmLink() ?? storage.get(sessionStorage, SESSION_KEY);
 
   const request = async (path, body, { auth = false } = {}) => {
     let res;
@@ -57,7 +84,9 @@ function createSupabaseBackend({ supabaseUrl, supabaseAnonKey }) {
     }
     // Lỗi nghiệp vụ từ Postgres (raise exception 'CODE') nằm trong message.
     const code = data?.message ?? data?.error_description ?? data?.msg ?? 'UNKNOWN';
-    throw new BackendError(/^[A-Z_]+$/.test(code) ? code : 'UNKNOWN');
+    const error = new BackendError(/^[A-Z_]+$/.test(code) ? code : 'UNKNOWN');
+    error.authCode = data?.error_code ?? (res.status === 429 ? 'over_email_send_rate_limit' : null);
+    throw error;
   };
 
   const rpc = (fn, args, opts) => request(`/rest/v1/rpc/${fn}`, args, opts);
@@ -69,7 +98,6 @@ function createSupabaseBackend({ supabaseUrl, supabaseAnonKey }) {
     register: (name, phone, courseId) =>
       rpc('register', { p_name: name, p_phone: phone, p_course: courseId }),
     lookup: (phone) => rpc('lookup', { p_phone: phone }),
-    cancel: (phone, code) => rpc('cancel', { p_phone: phone, p_code: code }),
 
     async signIn(email, password) {
       try {
@@ -79,6 +107,15 @@ function createSupabaseBackend({ supabaseUrl, supabaseAnonKey }) {
       }
       storage.set(sessionStorage, SESSION_KEY, session);
       return { email: session.user?.email ?? email };
+    },
+    async signUp(email, password) {
+      const redirect = encodeURIComponent(new URL('admin.html', location.href).href);
+      try {
+        await request(`/auth/v1/signup?redirect_to=${redirect}`, { email, password });
+      } catch (err) {
+        throw new BackendError(err.code === 'NETWORK' ? 'NETWORK' : AUTH_ERRORS[err.authCode] ?? 'UNKNOWN');
+      }
+      return { ok: true };
     },
     async signOut() {
       session = null;
@@ -90,6 +127,9 @@ function createSupabaseBackend({ supabaseUrl, supabaseAnonKey }) {
     adminDelete: (id) => admin('admin_delete', { p_id: id }),
     adminSettings: (isOpen, fillInOrder) =>
       admin('admin_settings', { p_is_open: isOpen, p_fill_in_order: fillInOrder }),
+    adminAdmins: () => admin('admin_admins'),
+    adminAddAdmin: (email) => admin('admin_add_admin', { p_email: email }),
+    adminRemoveAdmin: (email) => admin('admin_remove_admin', { p_email: email }),
   };
 }
 

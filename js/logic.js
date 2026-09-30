@@ -32,6 +32,22 @@ export function validatePhone(phone) {
   return null;
 }
 
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const PASSWORD_MIN = 8;
+
+/** @param {string} email @returns {string | null} */
+export function validateEmail(email) {
+  const value = String(email ?? '').trim();
+  if (!value) return 'Nhập email.';
+  if (!EMAIL_PATTERN.test(value) || value.length > 254) return errorMessage('INVALID_EMAIL');
+  return null;
+}
+
+/** @param {string} password @returns {string | null} */
+export function validatePassword(password) {
+  return String(password ?? '').length < PASSWORD_MIN ? errorMessage('WEAK_PASSWORD') : null;
+}
+
 /**
  * @typedef {{ id: number, name: string, capacity: number, taken: number, schedule?: string, members: string[] }} Course
  * @typedef {{ is_open: boolean, fill_in_order: boolean, waitlist: number, courses: Course[] }} Status
@@ -95,10 +111,13 @@ const ERRORS = {
   INVALID_PHONE: 'Số điện thoại cần đủ 10 số, bắt đầu bằng 0.',
   INVALID_COURSE: 'Khóa học không tồn tại.',
   NOT_FOUND: 'Không tìm thấy đăng ký với số điện thoại này.',
-  WRONG_CODE: 'Mã hủy chưa đúng.',
-  TOO_MANY_ATTEMPTS: 'Nhập sai mã quá 5 lần. Liên hệ người tổ chức để được hủy giúp.',
   FORBIDDEN: 'Tài khoản này không có quyền quản trị.',
-  BAD_LOGIN: 'Sai email hoặc mật khẩu.',
+  BAD_LOGIN: 'Sai email hoặc mật khẩu, hoặc email chưa được xác nhận.',
+  INVALID_EMAIL: 'Email chưa đúng định dạng.',
+  WEAK_PASSWORD: 'Mật khẩu cần ít nhất 8 ký tự.',
+  SIGNUP_DISABLED: 'Đang tắt tạo tài khoản mới. Nhờ người quản trị bật lại trong Supabase.',
+  RATE_LIMITED: 'Gửi email quá nhiều lần. Đợi khoảng 1 tiếng rồi thử lại.',
+  CANNOT_REMOVE_SELF: 'Bạn không thể tự gỡ quyền của chính mình.',
   SESSION_EXPIRED: 'Phiên đăng nhập đã hết hạn, đăng nhập lại nhé.',
   NETWORK: 'Mất kết nối. Kiểm tra mạng rồi thử lại.',
 };
