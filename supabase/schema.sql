@@ -258,6 +258,50 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
+create or replace function public.admin_update(p_id bigint, p_name text, p_phone text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_phone text := _normalize_phone(p_phone);
+  v_name  text := regexp_replace(btrim(coalesce(p_name, '')), '\s+', ' ', 'g');
+begin
+  if not _is_admin() then raise exception 'FORBIDDEN' using errcode = 'P0001'; end if;
+  perform _lock();
+  if not exists (select 1 from registrations where id = p_id) then
+    raise exception 'NOT_FOUND' using errcode = 'P0001';
+  end if;
+  if char_length(v_name) < 2 or char_length(v_name) > 80 then
+    raise exception 'INVALID_NAME' using errcode = 'P0001';
+  end if;
+  if v_phone !~ '^0[0-9]{9}$' then
+    raise exception 'INVALID_PHONE' using errcode = 'P0001';
+  end if;
+  if exists (select 1 from registrations where phone = v_phone and id <> p_id) then
+    raise exception 'ALREADY_REGISTERED' using errcode = 'P0001';
+  end if;
+  update registrations set full_name = v_name, phone = v_phone where id = p_id;
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- Đổi slot của 2 người: khóa, trạng thái và thứ tự (created_at) hoán đổi cho nhau.
+-- Dùng được trong cùng khóa (đổi thứ tự), giữa 2 khóa đầy, hoặc với danh sách chờ.
+create or replace function public.admin_swap(p_a bigint, p_b bigint)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_a registrations;
+  v_b registrations;
+begin
+  if not _is_admin() then raise exception 'FORBIDDEN' using errcode = 'P0001'; end if;
+  perform _lock();
+  select * into v_a from registrations where id = p_a;
+  select * into v_b from registrations where id = p_b;
+  if v_a.id is null or v_b.id is null then
+    raise exception 'NOT_FOUND' using errcode = 'P0001';
+  end if;
+  update registrations set course_id = v_b.course_id, status = v_b.status, created_at = v_b.created_at where id = v_a.id;
+  update registrations set course_id = v_a.course_id, status = v_a.status, created_at = v_a.created_at where id = v_b.id;
+  return jsonb_build_object('ok', true);
+end $$;
+
 create or replace function public.admin_settings(p_is_open boolean, p_fill_in_order boolean)
 returns jsonb language plpgsql security definer set search_path = public as $$
 begin
@@ -283,3 +327,5 @@ grant execute on function public.admin_list()                    to authenticate
 grant execute on function public.admin_move(bigint, int)         to authenticated;
 grant execute on function public.admin_delete(bigint)            to authenticated;
 grant execute on function public.admin_settings(boolean, boolean) to authenticated;
+grant execute on function public.admin_update(bigint, text, text) to authenticated;
+grant execute on function public.admin_swap(bigint, bigint)      to authenticated;

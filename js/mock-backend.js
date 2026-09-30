@@ -184,6 +184,31 @@ export function createMockBackend(io = {}) {
       return { ok: true };
     },
 
+    async adminUpdate(id, name, phone) {
+      requireAdmin();
+      const full_name = cleanName(name);
+      const p = normalizePhone(phone);
+      if (!state.rows.some((r) => r.id === id)) throw new BackendError('NOT_FOUND');
+      if (full_name.length < 2 || full_name.length > 80) throw new BackendError('INVALID_NAME');
+      if (!/^0\d{9}$/.test(p)) throw new BackendError('INVALID_PHONE');
+      if (state.rows.some((r) => r.phone === p && r.id !== id)) throw new BackendError('ALREADY_REGISTERED');
+      commit({ ...state, rows: state.rows.map((r) => (r.id === id ? { ...r, full_name, phone: p } : r)) });
+      return { ok: true };
+    },
+
+    async adminSwap(idA, idB) {
+      requireAdmin();
+      const a = state.rows.find((r) => r.id === idA);
+      const b = state.rows.find((r) => r.id === idB);
+      if (!a || !b) throw new BackendError('NOT_FOUND');
+      const slot = ({ course_id, status, created_at }) => ({ course_id, status, created_at });
+      commit({
+        ...state,
+        rows: state.rows.map((r) => (r.id === idA ? { ...r, ...slot(b) } : r.id === idB ? { ...r, ...slot(a) } : r)),
+      });
+      return { ok: true };
+    },
+
     async adminDelete(id) {
       requireAdmin();
       const row = state.rows.find((r) => r.id === id);

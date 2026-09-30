@@ -189,3 +189,55 @@ test('the single admin account is seeded and admin management is not exposed', a
   await asAdmin('admin@pickleball.local');
   assert.deepEqual(await call('admin_list'), []);
 });
+
+test('admin can edit a registration; phone stays unique and validated', async () => {
+  await asAdmin('admin@pickleball.local');
+  await call('register', 'Người Cũ', phone(1), 4);
+  await call('register', 'Người Khác', phone(2), 4);
+  const [first] = await call('admin_list');
+
+  assert.deepEqual(await call('admin_update', first.id, '  Người   Mới ', '+84 912 345 678'), { ok: true });
+  const [edited] = await call('admin_list');
+  assert.equal(edited.full_name, 'Người Mới');
+  assert.equal(edited.phone, '0912345678');
+  assert.equal(edited.course_id, 4);
+
+  assert.equal(await errorOf(call('admin_update', first.id, 'Trùng', phone(2))), 'ALREADY_REGISTERED');
+  assert.equal(await errorOf(call('admin_update', first.id, 'A', phone(3))), 'INVALID_NAME');
+  assert.equal(await errorOf(call('admin_update', first.id, 'Hợp lệ', '123')), 'INVALID_PHONE');
+  assert.equal(await errorOf(call('admin_update', 999, 'Hợp lệ', phone(3))), 'NOT_FOUND');
+  await asAdmin('stranger@x.vn');
+  assert.equal(await errorOf(call('admin_update', first.id, 'Hack', phone(3))), 'FORBIDDEN');
+});
+
+test('admin can swap two slots: within a course, across full courses, and with the waitlist', async () => {
+  await asAdmin('admin@pickleball.local');
+  await fill(4, 12);
+  await fill(5, 12);
+  await call('register', 'Người Chờ', phone(1), null);
+  const byPhone = async (p) => (await call('admin_list')).find((r) => r.phone === p);
+
+  // Trong cùng khóa: người số 1 và số 3 đổi thứ tự.
+  const a = await byPhone(phone(400));
+  const c = await byPhone(phone(402));
+  assert.deepEqual(await call('admin_swap', a.id, c.id), { ok: true });
+  assert.equal((await call('lookup', phone(402))).seat, 1);
+  assert.equal((await call('lookup', phone(400))).seat, 3);
+
+  // Giữa 2 khóa đều đầy.
+  const b5 = await byPhone(phone(505));
+  assert.deepEqual(await call('admin_swap', a.id, b5.id), { ok: true });
+  assert.equal((await call('lookup', phone(400))).course_id, 5);
+  assert.equal((await call('lookup', phone(505))).course_id, 4);
+  assert.deepEqual((await call('get_status')).courses.map((x) => x.taken), [12, 12]);
+
+  // Với danh sách chờ.
+  const w = await byPhone(phone(1));
+  assert.deepEqual(await call('admin_swap', w.id, b5.id), { ok: true });
+  assert.equal((await call('lookup', phone(1))).course_id, 4);
+  assert.equal((await call('lookup', phone(505))).status, 'waitlist');
+
+  assert.equal(await errorOf(call('admin_swap', w.id, 999)), 'NOT_FOUND');
+  await asAdmin('stranger@x.vn');
+  assert.equal(await errorOf(call('admin_swap', w.id, b5.id)), 'FORBIDDEN');
+});

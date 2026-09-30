@@ -104,6 +104,7 @@ export function formatPhone(phone) {
 const ERRORS = {
   ALREADY_REGISTERED: 'Số điện thoại này đã đăng ký rồi. Mỗi người chỉ giữ được 1 chỗ — tra cứu bên dưới để xem khóa của bạn.',
   COURSE_FULL: 'Khóa này vừa đủ người. Bạn chọn khóa còn lại nhé.',
+  ADMIN_COURSE_FULL: 'Khóa đó đã đủ người. Dùng nút ⇄ để đổi chỗ với một người trong khóa đó.',
   COURSE_NOT_OPEN: 'Khóa này mở khi khóa trước đủ người.',
   SEATS_AVAILABLE: 'Vẫn còn chỗ trống — chọn một khóa để giữ chỗ luôn.',
   CLOSED: 'Đăng ký đang tạm đóng.',

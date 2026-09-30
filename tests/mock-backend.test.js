@@ -129,3 +129,34 @@ test('the demo admin can change its password', async () => {
   await assert.rejects(api.signIn('admin@pickleball.local', 'demo'), (e) => e.code === 'BAD_LOGIN');
   await api.signIn('admin@pickleball.local', 'matkhaumoi1');
 });
+
+test('admin can edit a person and swap slots like the database does', async () => {
+  const { api } = setup();
+  await api.signIn('admin@pickleball.local', 'demo');
+  await fill(api, 4, 12);
+  await fill(api, 5, 12);
+  await api.register('Người Chờ', phone(1), null);
+  const byPhone = async (p) => (await api.adminList()).find((r) => r.phone === p);
+
+  const a = await byPhone(phone(400));
+  assert.deepEqual(await api.adminUpdate(a.id, '  Tên   Mới ', '+84 912 345 678'), { ok: true });
+  assert.equal((await byPhone('0912345678')).full_name, 'Tên Mới');
+  await assert.rejects(api.adminUpdate(a.id, 'Trùng', phone(401)), (e) => e.code === 'ALREADY_REGISTERED');
+  await assert.rejects(api.adminUpdate(a.id, 'A', phone(9)), (e) => e.code === 'INVALID_NAME');
+  await assert.rejects(api.adminUpdate(a.id, 'Hợp lệ', '1'), (e) => e.code === 'INVALID_PHONE');
+  await assert.rejects(api.adminUpdate(999, 'Hợp lệ', phone(9)), (e) => e.code === 'NOT_FOUND');
+
+  const c = await byPhone(phone(402));
+  assert.deepEqual(await api.adminSwap(a.id, c.id), { ok: true });
+  assert.equal((await api.lookup(phone(402))).seat, 1);
+
+  const b5 = await byPhone(phone(505));
+  const w = await byPhone(phone(1));
+  assert.deepEqual(await api.adminSwap(w.id, b5.id), { ok: true });
+  assert.equal((await api.lookup(phone(1))).course_id, 5);
+  assert.equal((await api.lookup(phone(505))).status, 'waitlist');
+  await assert.rejects(api.adminSwap(w.id, 999), (e) => e.code === 'NOT_FOUND');
+
+  await api.signOut();
+  await assert.rejects(api.adminSwap(w.id, b5.id), (e) => e.code === 'FORBIDDEN');
+});

@@ -98,6 +98,8 @@ function createSupabaseBackend({ supabaseUrl, supabaseAnonKey }) {
     adminList: () => admin('admin_list'),
     adminMove: (id, courseId) => admin('admin_move', { p_id: id, p_course: courseId }),
     adminDelete: (id) => admin('admin_delete', { p_id: id }),
+    adminUpdate: (id, name, phone) => admin('admin_update', { p_id: id, p_name: name, p_phone: phone }),
+    adminSwap: (idA, idB) => admin('admin_swap', { p_a: idA, p_b: idB }),
     adminSettings: (isOpen, fillInOrder) =>
       admin('admin_settings', { p_is_open: isOpen, p_fill_in_order: fillInOrder }),
   };
