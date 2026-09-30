@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quản trị Pickleball</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#1f5a45">
+  <link rel="icon" href="assets/ball.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <script type="module" src="js/admin.js"></script>
+</head>
+<body>
+  <div class="demo-strip" id="demo-strip" hidden>
+    <span>Chế độ demo · đăng nhập bằng <b>admin@demo</b> / <b>demo</b></span>
+  </div>
+
+  <header class="bar">
+    <a class="brand" href="index.html">
+      <img src="assets/ball.svg" alt="" width="28" height="28">
+      <span>Pickleball · Quản trị</span>
+    </a>
+    <div class="bar-user" id="bar-user" hidden>
+      <span id="admin-email"></span>
+      <button type="button" class="button button-quiet button-sm" id="sign-out">
+        <svg aria-hidden="true"><use href="assets/icons.svg#logout"></use></svg>Đăng xuất
+      </button>
+    </div>
+  </header>
+
+  <main class="admin">
+    <form class="login" id="login" novalidate>
+      <h1>Đăng nhập quản trị</h1>
+      <p>Dùng tài khoản đã tạo trong Supabase → Authentication.</p>
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" type="email" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="password">Mật khẩu</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+      </div>
+      <p class="form-error" id="login-error" role="alert" hidden></p>
+      <button class="button button-ball" type="submit" id="login-submit"><span class="button-label">Đăng nhập</span></button>
+    </form>
+
+    <div class="dash" id="dash" hidden>
+      <section class="summary" aria-label="Tổng quan">
+        <div class="summary-stats" id="summary"></div>
+        <div class="summary-actions">
+          <label class="switch">
+            <input type="checkbox" id="is-open">
+            <span class="switch-track" aria-hidden="true"></span>
+            <span>Mở đăng ký</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="fill-in-order">
+            <span class="switch-track" aria-hidden="true"></span>
+            <span>Khóa 5 chỉ mở khi Khóa 4 đủ</span>
+          </label>
+          <button type="button" class="button button-quiet button-sm" id="export">
+            <svg aria-hidden="true"><use href="assets/icons.svg#download"></use></svg>Xuất Excel (CSV)
+          </button>
+        </div>
+      </section>
+
+      <p class="form-error" id="dash-error" role="alert" hidden></p>
+      <div class="groups" id="groups"></div>
+    </div>
+  </main>
+</body>
+</html>

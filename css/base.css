@@ -1,0 +1,150 @@
+/* Nền tảng dùng chung: màu sân, chữ, nút, ô nhập. */
+:root {
+  --ground: #edf2ef;
+  --surface: #ffffff;
+  --surface-2: #f5f8f6;
+  --ink: #10231b;
+  --ink-2: #3e5549;
+  --ink-3: #5e7268;
+  --rule: #d5e0da;
+  --rule-strong: #b7c7bf;
+
+  --surround: #1f5a45;
+  --surround-deep: #174535;
+  --court: #2461a8;
+  --court-deep: #1b4d88;
+  --kitchen: #2d70bd;
+  --line: #f4f8fb;
+
+  --ball: #e2f23c;
+  --ball-deep: #c9db1f;
+  --ball-ink: #13261c;
+
+  --ok: #1d7a4f;
+  --ok-soft: #e3f3ea;
+  --warn: #8a5a00;
+  --warn-soft: #fbf1d9;
+  --danger: #b3261e;
+  --danger-soft: #fbe9e7;
+  --focus: #1b4d88;
+
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgb(16 35 27 / 0.06), 0 8px 24px -8px rgb(16 35 27 / 0.16);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --font: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: light;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 1rem;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--ball); color: var(--ball-ink); }
+
+h1, h2, h3 { line-height: 1.2; text-wrap: balance; margin: 0; }
+
+a { color: var(--court-deep); text-underline-offset: 3px; }
+
+:focus-visible { outline: 2.5px solid var(--focus); outline-offset: 2px; }
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+
+[hidden] { display: none !important; }
+
+svg { width: 1.25em; height: 1.25em; flex: none; }
+
+/* ─── Ô nhập ─── */
+label { display: block; font-weight: 600; font-size: 0.9375rem; margin-bottom: 6px; }
+
+input, select {
+  width: 100%;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1.5px solid var(--rule-strong);
+  border-radius: var(--radius-sm);
+  padding: 11px 14px;
+  min-height: 48px;
+  caret-color: var(--court);
+  transition: border-color 150ms, box-shadow 150ms;
+}
+input::placeholder { color: #71857b; }
+input:hover, select:hover { border-color: var(--ink-3); }
+input:focus-visible, select:focus-visible {
+  outline: none;
+  border-color: var(--court);
+  box-shadow: 0 0 0 3px rgb(36 97 168 / 0.22);
+}
+input[aria-invalid="true"] { border-color: var(--danger); }
+input:disabled { background: var(--surface-2); color: var(--ink-3); }
+
+.field { margin-bottom: 18px; }
+.field-hint { margin: 6px 0 0; font-size: 0.8125rem; color: var(--ink-3); }
+.field-error, .form-error { margin: 6px 0 0; font-size: 0.875rem; font-weight: 500; color: var(--danger); }
+.form-error { padding: 10px 12px; background: var(--danger-soft); border-radius: var(--radius-sm); margin-bottom: 14px; }
+
+/* ─── Nút ─── */
+.button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 48px;
+  padding: 0 20px;
+  font: inherit; font-weight: 700;
+  border: 0; border-radius: 999px;
+  cursor: pointer;
+  transition: transform 150ms var(--ease-out), background-color 150ms, box-shadow 150ms, opacity 150ms;
+}
+.button:active:not(:disabled) { transform: translateY(1px) scale(0.99); }
+.button:disabled { cursor: not-allowed; opacity: 0.55; }
+
+.button-ball {
+  width: 100%;
+  background: var(--ball);
+  color: var(--ball-ink);
+  font-size: 1.0625rem;
+  box-shadow: inset 0 -3px 0 var(--ball-deep), 0 6px 16px -6px rgb(120 140 0 / 0.55);
+}
+.button-ball:hover:not(:disabled) { background: #eaf85a; }
+.button-ball.is-busy .button-label::after {
+  content: ""; display: inline-block; width: 0.9em; height: 0.9em; margin-left: 10px; vertical-align: -0.1em;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+
+.button-quiet { background: var(--surface-2); color: var(--ink); border: 1.5px solid var(--rule-strong); }
+.button-quiet:hover:not(:disabled) { border-color: var(--ink-3); background: #fff; }
+
+.button-danger { background: var(--danger); color: #fff; }
+.button-danger:hover:not(:disabled) { background: #9a1f18; }
+
+.link-button {
+  font: inherit; font-weight: 600; color: inherit; background: none; border: 0; padding: 4px 2px;
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.demo-strip {
+  display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: center; align-items: center;
+  padding: 8px 16px;
+  background: var(--warn-soft); color: var(--warn);
+  font-size: 0.875rem; font-weight: 500; text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+}

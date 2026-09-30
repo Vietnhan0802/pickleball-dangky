@@ -1,0 +1,15 @@
+{
+  "name": "pickleball-dangky",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Trang đăng ký lớp Pickleball khóa 4 & 5 (nội bộ công ty)",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=js/logic.js --test-coverage-include=js/mock-backend.js \"tests/*.test.js\"",
+    "dev": "python -m http.server 5173"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8"
+  }
+}

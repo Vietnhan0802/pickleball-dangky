@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Đăng ký Pickleball</title>
+  <meta name="description" content="Đăng ký lớp Pickleball khóa 4 và khóa 5 — 12 chỗ mỗi khóa, mỗi người 1 chỗ.">
+  <meta name="theme-color" content="#1f5a45">
+  <link rel="icon" href="assets/ball.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/app.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <div class="demo-strip" id="demo-strip" hidden>
+    <span>Chế độ demo · dữ liệu mẫu, chưa nối Supabase</span>
+    <button type="button" class="link-button" id="demo-reset">Đặt lại dữ liệu</button>
+  </div>
+
+  <main class="page">
+    <header class="intro">
+      <h1>Đăng ký lớp Pickleball</h1>
+      <p class="lede">Khóa 4 và Khóa 5, mỗi khóa <strong>12 chỗ</strong>. Mỗi người giữ được 1 chỗ. Chạm vào nửa sân để chọn khóa.</p>
+    </header>
+
+    <div class="layout">
+      <section class="court-wrap" aria-labelledby="court-title">
+        <h2 id="court-title" class="visually-hidden">Chọn khóa học</h2>
+        <div class="court" id="court" role="radiogroup" aria-label="Chọn khóa">
+          <!-- Hai nửa sân được dựng bởi js/app.js -->
+          <div class="court-half is-loading" aria-hidden="true"></div>
+          <div class="court-net" aria-hidden="true"><span></span></div>
+          <div class="court-half is-loading" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <section class="panel" aria-live="polite">
+        <div class="notice" id="notice" hidden></div>
+
+        <form class="signup" id="signup" novalidate>
+          <h2 class="panel-title" id="form-title">Giữ chỗ của bạn</h2>
+          <p class="panel-sub" id="form-sub">&nbsp;</p>
+
+          <div class="field">
+            <label for="name">Họ và tên</label>
+            <input id="name" name="name" autocomplete="name" maxlength="80" placeholder="Nguyễn Văn An" required>
+            <p class="field-error" id="name-error" hidden></p>
+          </div>
+
+          <div class="field">
+            <label for="phone">Số điện thoại</label>
+            <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="0901 234 567" required>
+            <p class="field-error" id="phone-error" hidden></p>
+            <p class="field-hint">Dùng để nhận diện, mỗi số chỉ đăng ký 1 lần. Không hiển thị công khai.</p>
+          </div>
+
+          <p class="form-error" id="form-error" role="alert" hidden></p>
+
+          <button class="button button-ball" type="submit" id="submit" disabled>
+            <span class="button-label" id="submit-label">Đang tải…</span>
+          </button>
+        </form>
+
+        <div class="ticket" id="ticket" hidden tabindex="-1">
+          <svg class="ticket-icon" aria-hidden="true"><use href="assets/icons.svg#check"></use></svg>
+          <h2 class="ticket-title" id="ticket-title"></h2>
+          <p class="ticket-sub" id="ticket-sub"></p>
+          <dl class="ticket-facts">
+            <div><dt>Người đăng ký</dt><dd id="ticket-name"></dd></div>
+            <div><dt id="ticket-slot-label">Vị trí</dt><dd id="ticket-slot"></dd></div>
+            <div class="ticket-code"><dt>Mã hủy chỗ</dt><dd id="ticket-code"></dd></div>
+          </dl>
+          <p class="ticket-note">Chụp màn hình lại mã hủy. Bạn cần mã này nếu muốn tự hủy để nhường chỗ.</p>
+        </div>
+
+        <details class="lookup" id="lookup">
+          <summary>
+            <span>Đã đăng ký? Tra cứu hoặc hủy chỗ</span>
+            <svg aria-hidden="true"><use href="assets/icons.svg#chevron"></use></svg>
+          </summary>
+          <form class="lookup-form" id="lookup-form" novalidate>
+            <label for="lookup-phone">Số điện thoại đã đăng ký</label>
+            <div class="inline-field">
+              <input id="lookup-phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="0901 234 567">
+              <button class="button button-quiet" type="submit">Tra cứu</button>
+            </div>
+          </form>
+          <div class="lookup-result" id="lookup-result" hidden></div>
+          <form class="cancel-form" id="cancel-form" novalidate hidden>
+            <label for="cancel-code">Mã hủy 4 số</label>
+            <div class="inline-field">
+              <input id="cancel-code" inputmode="numeric" autocomplete="one-time-code" maxlength="4" pattern="\d{4}" placeholder="••••">
+              <button class="button button-danger" type="submit" id="cancel-submit">Hủy chỗ</button>
+            </div>
+            <p class="field-hint">Quên mã? Nhắn người tổ chức để được hủy giúp.</p>
+          </form>
+          <p class="form-error" id="lookup-error" role="alert" hidden></p>
+        </details>
+      </section>
+    </div>
+
+    <section class="roster" aria-labelledby="roster-title">
+      <h2 id="roster-title">Ai đã đăng ký</h2>
+      <div class="roster-grid" id="roster"></div>
+    </section>
+
+    <footer class="foot">
+      <a href="admin.html">Trang quản trị</a>
+    </footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,246 @@
+/* Trang đăng ký: sân pickleball là bảng chọn khóa. */
+.page {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 28px 16px 40px;
+}
+
+.intro { max-width: 60ch; margin-bottom: 24px; }
+.intro h1 { font-size: clamp(1.75rem, 1.2rem + 2.4vw, 2.625rem); font-weight: 800; letter-spacing: -0.025em; }
+.lede { margin: 10px 0 0; color: var(--ink-2); font-size: 1.0625rem; }
+
+.layout { display: grid; gap: 24px; align-items: start; }
+@media (min-width: 880px) {
+  .page { padding-top: 48px; }
+  .layout { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; }
+  .court-wrap { position: sticky; top: 24px; }
+}
+
+/* ─── Sân ─── */
+.court {
+  --gap: 14px;
+  display: grid;
+  grid-template-rows: 1fr auto 1fr;
+  padding: var(--gap);
+  background: var(--surround);
+  border-radius: 18px;
+  box-shadow: 0 2px 4px rgb(16 35 27 / 0.12), 0 24px 48px -20px rgb(16 35 27 / 0.45);
+  max-width: 520px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.court-half {
+  --line-w: 3px;
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  min-height: 236px;
+  background: var(--court);
+  border: var(--line-w) solid var(--line);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 200ms var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+.court-half:first-child { border-bottom: 0; }
+.court-half:last-child { border-top: 0; grid-template-rows: auto 1fr; }
+.court-half:last-child .kitchen { order: -1; }
+.court-half.is-loading { cursor: default; }
+.court-half:hover:not([aria-disabled="true"], .is-loading) { background: #2868b3; }
+.court-half:focus-visible { outline: 3px solid var(--ball); outline-offset: -6px; }
+
+/* Hai ô giao bóng, mỗi ô 6 chỗ, ngăn bởi vạch giữa sân. */
+.boxes {
+  display: grid;
+  grid-template-columns: 1fr var(--line-w) 1fr;
+}
+.boxes::before {
+  content: "";
+  grid-column: 2; grid-row: 1;
+  background: var(--line);
+}
+.box {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  place-content: center;
+  gap: 10px 12px;
+  padding: 16px 10px;
+}
+.box:first-child { grid-column: 1; grid-row: 1; }
+.box:last-child { grid-column: 3; grid-row: 1; }
+
+.slot {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-size: 0.8125rem; font-weight: 700; letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+}
+.slot.is-empty { border: 2px dashed rgb(244 248 251 / 0.5); }
+.slot.is-taken {
+  background: var(--ball);
+  color: var(--ball-ink);
+  box-shadow: inset -3px -4px 0 rgb(150 170 0 / 0.35), 0 3px 6px rgb(8 30 60 / 0.35);
+}
+.slot.is-mine { outline: 3px solid #fff; outline-offset: 3px; }
+.slot.is-new { animation: land 900ms var(--ease-out) both; }
+
+@keyframes land {
+  0%   { transform: translateY(-70px) scale(1.5); opacity: 0; }
+  45%  { transform: translateY(0) scale(1); opacity: 1; }
+  62%  { transform: translateY(-12px) scale(1, 1); }
+  78%  { transform: translateY(0) scale(1.08, 0.92); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* Vùng bếp (non-volley zone) sát lưới: nơi ghi tên khóa. */
+.kitchen {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 72px;
+  padding: 12px 16px;
+  background: var(--kitchen);
+  border-top: var(--line-w) solid var(--line);
+  transition: background-color 200ms var(--ease-out), color 200ms var(--ease-out);
+}
+.court-half:last-child .kitchen { border-top: 0; border-bottom: var(--line-w) solid var(--line); }
+
+.kitchen-name { font-size: 1.375rem; font-weight: 800; letter-spacing: -0.01em; line-height: 1.1; }
+.kitchen-state { display: flex; align-items: center; gap: 6px; font-size: 0.875rem; font-weight: 600; opacity: 0.92; }
+.kitchen-count { font-variant-numeric: tabular-nums; font-size: 0.9375rem; font-weight: 700; text-align: right; line-height: 1.2; }
+.kitchen-count small { display: block; font-size: 0.75rem; font-weight: 500; opacity: 0.85; }
+
+.court-half[aria-checked="true"] .kitchen { background: var(--ball); color: var(--ball-ink); }
+
+.court-half[aria-disabled="true"] { cursor: not-allowed; background: var(--court-deep); }
+.court-half[aria-disabled="true"] .kitchen { background: #235d9f; }
+.court-half[aria-disabled="true"] .slot.is-taken { box-shadow: inset -3px -4px 0 rgb(150 170 0 / 0.35); }
+
+/* Băng khóa sân khi đủ người. */
+.tape {
+  position: absolute;
+  left: -12px; right: -12px; top: -10px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 9px 12px;
+  background: var(--ball-ink);
+  color: var(--ball);
+  font-size: 0.9375rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+  transform: rotate(-2.5deg);
+  box-shadow: 0 6px 14px rgb(0 0 0 / 0.3);
+  pointer-events: none;
+  animation: tape-in 500ms var(--ease-out) both;
+}
+.court-half:last-child .tape { top: auto; bottom: -10px; transform: rotate(2.5deg); }
+.court-half:has(.tape) .boxes { padding-top: 26px; }
+.court-half:last-child:has(.tape) .boxes { padding-top: 0; padding-bottom: 26px; }
+@keyframes tape-in {
+  from { clip-path: inset(0 100% 0 0); }
+  to   { clip-path: inset(0 0 0 0); }
+}
+
+.court-net {
+  position: relative;
+  height: 14px;
+  margin: 0 calc(var(--gap) * -0.5);
+  background:
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.28) 0 1px, transparent 1px 6px),
+    #0f2230;
+  border-top: 3px solid #fff;
+  z-index: 1;
+}
+.court-net::before, .court-net::after {
+  content: ""; position: absolute; top: -7px; width: 7px; height: 22px; background: #0b1820; border-radius: 3px;
+}
+.court-net::before { left: -4px; }
+.court-net::after { right: -4px; }
+
+.court-caption { max-width: 520px; margin: 12px auto 0; font-size: 0.875rem; color: var(--ink-3); text-align: center; }
+
+@media (max-width: 380px) {
+  .slot { width: 34px; height: 34px; font-size: 0.75rem; }
+  .box { gap: 8px 8px; padding: 14px 6px; }
+  .court { --gap: 10px; }
+}
+
+/* ─── Bảng bên phải ─── */
+.panel {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 24px 20px;
+  box-shadow: var(--shadow);
+}
+@media (min-width: 880px) { .panel { padding: 32px; } }
+
+.panel-title { font-size: 1.375rem; font-weight: 800; letter-spacing: -0.015em; }
+.panel-sub { margin: 6px 0 22px; color: var(--ink-2); }
+.panel-sub strong { color: var(--ink); }
+
+.notice {
+  display: flex; gap: 10px; align-items: flex-start;
+  margin-bottom: 20px; padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--warn-soft); color: var(--warn);
+  font-weight: 500; font-size: 0.9375rem;
+}
+.notice svg { margin-top: 2px; }
+
+/* Vé xác nhận */
+.ticket { text-align: left; outline: none; }
+.ticket-icon { width: 44px; height: 44px; color: var(--ok); margin-bottom: 10px; }
+.ticket-title { font-size: 1.625rem; font-weight: 800; letter-spacing: -0.02em; }
+.ticket-sub { margin: 6px 0 20px; color: var(--ink-2); }
+.ticket-facts { margin: 0; display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; }
+.ticket-facts div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 12px 16px; background: var(--surface); }
+.ticket-facts dt { color: var(--ink-3); font-size: 0.875rem; }
+.ticket-facts dd { margin: 0; font-weight: 700; text-align: right; }
+.ticket-code { background: var(--surface-2) !important; }
+.ticket-code dd { font-size: 1.75rem; letter-spacing: 0.18em; font-variant-numeric: tabular-nums; color: var(--court-deep); }
+.ticket-note { margin: 12px 0 0; font-size: 0.875rem; color: var(--ink-3); }
+
+/* Tra cứu / hủy */
+.lookup { margin-top: 24px; border-top: 1px solid var(--rule); padding-top: 8px; }
+.lookup summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 44px; cursor: pointer; font-weight: 600; color: var(--court-deep); list-style: none;
+}
+.lookup summary::-webkit-details-marker { display: none; }
+.lookup summary svg { transition: transform 200ms var(--ease-out); }
+.lookup[open] summary svg { transform: rotate(180deg); }
+.lookup-form, .cancel-form { margin-top: 10px; }
+.inline-field { display: flex; gap: 8px; }
+.inline-field input { flex: 1; min-width: 0; }
+.inline-field .button { flex: none; }
+.lookup-result { margin-top: 14px; padding: 14px 16px; background: var(--surface-2); border-radius: var(--radius-sm); }
+.lookup-result strong { display: block; font-size: 1.0625rem; }
+.lookup-result p { margin: 2px 0 0; color: var(--ink-2); }
+.lookup-result.is-ok { background: var(--ok-soft); }
+.cancel-form { margin-top: 16px; }
+.cancel-form #cancel-code { letter-spacing: 0.3em; font-variant-numeric: tabular-nums; }
+
+/* ─── Danh sách ─── */
+.roster { margin-top: 48px; }
+.roster > h2 { font-size: 1.25rem; font-weight: 800; margin-bottom: 16px; }
+.roster-grid { display: grid; gap: 16px; }
+@media (min-width: 720px) { .roster-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); } }
+
+.roster-col { background: var(--surface); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); }
+.roster-col h3 { display: flex; justify-content: space-between; align-items: baseline; font-size: 1rem; font-weight: 700; margin-bottom: 10px; }
+.roster-col h3 span { font-weight: 600; color: var(--ink-3); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.roster-col ol { margin: 0; padding: 0; list-style: none; counter-reset: n; }
+.roster-col li {
+  counter-increment: n;
+  display: flex; gap: 12px; align-items: baseline;
+  padding: 7px 0; border-top: 1px solid var(--rule);
+}
+.roster-col li::before {
+  content: counter(n);
+  width: 1.5em; text-align: right; flex: none;
+  color: var(--ink-3); font-size: 0.8125rem; font-variant-numeric: tabular-nums;
+}
+.roster-col li.is-open { color: var(--ink-3); }
+.roster-col li.is-mine { font-weight: 700; }
+.roster-col li.is-mine::after { content: "bạn"; margin-left: auto; font-size: 0.75rem; font-weight: 700; color: var(--ball-ink); background: var(--ball); padding: 1px 8px; border-radius: 999px; }
+.roster-empty { margin: 0; color: var(--ink-3); font-size: 0.9375rem; }
+
+.foot { margin-top: 48px; text-align: center; font-size: 0.875rem; }
+.foot a { color: var(--ink-3); }
