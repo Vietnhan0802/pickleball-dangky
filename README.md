@@ -5,7 +5,8 @@ Khóa nào đủ người thì tự khóa. Cả hai khóa đều đủ thì ngư
 có người hủy là người chờ lâu nhất được xếp vào.
 
 - `index.html`: trang đăng ký và tra cứu chỗ bằng SĐT. Người học không tự hủy được, chỉ admin mới xóa hoặc chuyển chỗ.
-- `admin.html`: trang quản trị, gồm xem danh sách, chuyển khóa, xóa, mở/đóng đăng ký, xuất CSV, đổi mật khẩu
+- `admin.html`: trang quản trị, gồm xem danh sách, chuyển khóa, xóa, sửa khóa (tên, số chỗ, lịch học), copy danh sách để dán Zalo, mở/đóng đăng ký, xuất CSV, đổi mật khẩu
+- Realtime: có người đăng ký là sân và trang admin cập nhật ngay, không cần tải lại
 - `supabase/schema.sql`: database và toàn bộ luật (chặn trùng, giới hạn 12, danh sách chờ)
 
 Chưa cấu hình Supabase thì trang chạy **chế độ demo**, dữ liệu giả lưu trong trình duyệt
@@ -24,11 +25,15 @@ Chưa cấu hình Supabase thì trang chạy **chế độ demo**, dữ liệu g
 6. **Project Settings → API**: copy *Project URL* và *anon public key* vào `js/config.js`.
 
 Anon key là khóa công khai, được phép nằm trong web. Bảng dữ liệu đã bật RLS và khóa hết;
-người dùng chỉ gọi được các hàm `get_status`, `register`, `lookup`, `cancel`.
+người dùng chỉ gọi được các hàm `get_status`, `register`, `lookup`.
+
+**Realtime:** mỗi thay đổi, database phát tín hiệu `changed` (không kèm dữ liệu) lên kênh công khai
+`pickleball`, trang web nghe được thì tải lại trạng thái. Cần bật **Realtime Settings → Allow public access**
+(mặc định đã bật). Nếu realtime không kết nối được, trang vẫn tự tải lại mỗi 15 giây.
 
 ## Tùy chỉnh
 
-- Đổi tên, số chỗ, lịch học: sửa bảng `courses` trong Supabase → Table Editor.
+- Đổi tên, số chỗ, lịch học: nút **Sửa khóa** ở trang admin. Tăng số chỗ thì người chờ được xếp vào ngay; không giảm được dưới số người đang có.
 - **Khóa 5 chỉ mở khi Khóa 4 đủ**: bật/tắt ở trang admin (mặc định tắt, tức người đăng ký tự chọn khóa).
 - Đóng đăng ký: tắt công tắc *Mở đăng ký* ở trang admin.
 

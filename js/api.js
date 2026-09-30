@@ -4,6 +4,7 @@ import { BackendError, createMockBackend } from './mock-backend.js';
 
 export { BackendError };
 
+const REALTIME_JS = 'https://cdn.jsdelivr.net/npm/@supabase/realtime-js@2.117.2/+esm';
 const DEMO_KEY = 'pickleball-demo-v1';
 const SESSION_KEY = 'pickleball-admin-session';
 
@@ -102,13 +103,35 @@ function createSupabaseBackend({ supabaseUrl, supabaseAnonKey }) {
     adminSwap: (idA, idB) => admin('admin_swap', { p_a: idA, p_b: idB }),
     adminSettings: (isOpen, fillInOrder) =>
       admin('admin_settings', { p_is_open: isOpen, p_fill_in_order: fillInOrder }),
+    adminUpdateCourse: (id, name, capacity, schedule) =>
+      admin('admin_update_course', { p_id: id, p_name: name, p_capacity: capacity, p_schedule: schedule }),
+
+    /** Gọi onChange mỗi khi database báo có thay đổi (xem _notify_change trong schema.sql). */
+    async subscribe(onChange) {
+      const { RealtimeClient } = await import(REALTIME_JS);
+      const client = new RealtimeClient(`${base.replace(/^http/, 'ws')}/realtime/v1`, {
+        params: { apikey: supabaseAnonKey },
+      });
+      client.channel('pickleball', { config: { private: false } })
+        .on('broadcast', { event: 'changed' }, onChange)
+        .subscribe();
+    },
   };
 }
 
 export function createApi(config = CONFIG) {
   if (config.supabaseUrl && config.supabaseAnonKey) return createSupabaseBackend(config);
-  return createMockBackend({
+  const backend = createMockBackend({
     load: () => storage.get(localStorage, DEMO_KEY),
     save: (state) => storage.set(localStorage, DEMO_KEY, state),
   });
+  // Demo: tab khác ghi localStorage thì tab này nhận sự kiện "storage".
+  backend.subscribe = async (onChange) => {
+    addEventListener('storage', (event) => {
+      if (event.key !== DEMO_KEY) return;
+      backend.reload();
+      onChange();
+    });
+  };
+  return backend;
 }

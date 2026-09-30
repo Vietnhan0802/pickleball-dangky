@@ -312,6 +312,58 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
+-- Sửa tên, số chỗ, lịch học của khóa. Tăng số chỗ thì người chờ được xếp vào ngay.
+create or replace function public.admin_update_course(p_id int, p_name text, p_capacity int, p_schedule text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_name     text := regexp_replace(btrim(coalesce(p_name, '')), '\s+', ' ', 'g');
+  v_schedule text := btrim(coalesce(p_schedule, ''));
+begin
+  if not _is_admin() then raise exception 'FORBIDDEN' using errcode = 'P0001'; end if;
+  perform _lock();
+  if not exists (select 1 from courses where id = p_id) then
+    raise exception 'INVALID_COURSE' using errcode = 'P0001';
+  end if;
+  if char_length(v_name) < 1 or char_length(v_name) > 40 then
+    raise exception 'INVALID_COURSE_NAME' using errcode = 'P0001';
+  end if;
+  if char_length(v_schedule) > 120 then
+    raise exception 'INVALID_SCHEDULE' using errcode = 'P0001';
+  end if;
+  if p_capacity is null or p_capacity < 1 or p_capacity > 50 then
+    raise exception 'INVALID_CAPACITY' using errcode = 'P0001';
+  end if;
+  if p_capacity < _taken(p_id) then
+    raise exception 'CAPACITY_TOO_SMALL' using errcode = 'P0001';
+  end if;
+  update courses set name = v_name, capacity = p_capacity, schedule = v_schedule where id = p_id;
+  perform _promote_waitlist(p_id);
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- ─── Realtime ────────────────────────────────────────────────────────────
+-- Có thay đổi thì phát tín hiệu "changed" (không kèm dữ liệu) lên kênh công khai
+-- "pickleball"; trang web nghe được sẽ gọi lại get_status(). Không có Supabase
+-- Realtime (ví dụ khi test) thì bỏ qua.
+create or replace function public._notify_change()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  if to_regprocedure('realtime.send(jsonb,text,text,boolean)') is not null then
+    perform realtime.send('{}'::jsonb, 'changed', 'pickleball', false);
+  end if;
+  return null;
+end $$;
+
+drop trigger if exists registrations_notify on public.registrations;
+create trigger registrations_notify after insert or update or delete on public.registrations
+  for each statement execute function public._notify_change();
+drop trigger if exists courses_notify on public.courses;
+create trigger courses_notify after insert or update or delete on public.courses
+  for each statement execute function public._notify_change();
+drop trigger if exists settings_notify on public.settings;
+create trigger settings_notify after update on public.settings
+  for each statement execute function public._notify_change();
+
 -- Chỉ có 1 tài khoản admin (tên đăng nhập "admin"), không cấp quyền qua giao diện.
 drop function if exists public.admin_admins();
 drop function if exists public.admin_add_admin(text);
@@ -329,3 +381,4 @@ grant execute on function public.admin_delete(bigint)            to authenticate
 grant execute on function public.admin_settings(boolean, boolean) to authenticated;
 grant execute on function public.admin_update(bigint, text, text) to authenticated;
 grant execute on function public.admin_swap(bigint, bigint)      to authenticated;
+grant execute on function public.admin_update_course(int, text, int, text) to authenticated;

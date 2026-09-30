@@ -160,3 +160,26 @@ test('admin can edit a person and swap slots like the database does', async () =
   await api.signOut();
   await assert.rejects(api.adminSwap(w.id, b5.id), (e) => e.code === 'FORBIDDEN');
 });
+
+test('admin can edit a course like the database does', async () => {
+  const { api } = setup();
+  await fill(api, 4, 12);
+  await fill(api, 5, 12);
+  await api.register('Chờ 1', phone(1), null);
+  await assert.rejects(api.adminUpdateCourse(4, 'Khóa 4', 13, ''), (e) => e.code === 'FORBIDDEN');
+  await api.signIn(api.demoAdmin.email, api.demoAdmin.password);
+
+  assert.deepEqual(await api.adminUpdateCourse(4, ' Khóa  sáng ', 13, ' T3 · 18:00 '), { ok: true });
+  const [course] = (await api.getStatus()).courses;
+  assert.deepEqual([course.name, course.capacity, course.schedule, course.taken], ['Khóa sáng', 13, 'T3 · 18:00', 13]);
+  assert.equal((await api.lookup(phone(1))).course_id, 4);
+
+  const codes = await Promise.all([
+    api.adminUpdateCourse(4, 'Khóa 4', 12, ''),
+    api.adminUpdateCourse(4, ' ', 13, ''),
+    api.adminUpdateCourse(4, 'Khóa 4', 0, ''),
+    api.adminUpdateCourse(4, 'Khóa 4', 13, 'x'.repeat(121)),
+    api.adminUpdateCourse(9, 'Khóa 9', 13, ''),
+  ].map((p) => p.catch(codeOf)));
+  assert.deepEqual(codes, ['CAPACITY_TOO_SMALL', 'INVALID_COURSE_NAME', 'INVALID_CAPACITY', 'INVALID_SCHEDULE', 'INVALID_COURSE']);
+});

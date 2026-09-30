@@ -241,3 +241,42 @@ test('admin can swap two slots: within a course, across full courses, and with t
   await asAdmin('stranger@x.vn');
   assert.equal(await errorOf(call('admin_swap', w.id, b5.id)), 'FORBIDDEN');
 });
+
+test('admin can edit a course; raising capacity pulls people off the waitlist', async () => {
+  await db.exec("insert into admins values ('boss@congty.vn')");
+  await fill(4, 12);
+  await fill(5, 12);
+  await call('register', 'Chờ 1', phone(1), null);
+  await call('register', 'Chờ 2', phone(2), null);
+  assert.equal(await errorOf(call('admin_update_course', 4, 'Khóa 4', 14, '')), 'FORBIDDEN');
+  await asAdmin();
+
+  assert.deepEqual(await call('admin_update_course', 4, '  Khóa   sáng ', 13, ' T3, T5 · 18:00 '), { ok: true });
+  const course = (await call('get_status')).courses[0];
+  assert.deepEqual([course.name, course.capacity, course.schedule, course.taken], ['Khóa sáng', 13, 'T3, T5 · 18:00', 13]);
+  assert.equal((await call('lookup', phone(1))).course_id, 4);
+  assert.equal((await call('lookup', phone(2))).status, 'waitlist');
+
+  assert.equal(await errorOf(call('admin_update_course', 4, 'Khóa 4', 12, '')), 'CAPACITY_TOO_SMALL');
+  assert.equal(await errorOf(call('admin_update_course', 4, ' ', 13, '')), 'INVALID_COURSE_NAME');
+  assert.equal(await errorOf(call('admin_update_course', 4, 'Khóa 4', 0, '')), 'INVALID_CAPACITY');
+  assert.equal(await errorOf(call('admin_update_course', 4, 'Khóa 4', 13, 'x'.repeat(121))), 'INVALID_SCHEDULE');
+  assert.equal(await errorOf(call('admin_update_course', 9, 'Khóa 9', 13, '')), 'INVALID_COURSE');
+});
+
+test('changes fire the realtime notifier without Supabase Realtime installed', async () => {
+  const { rows } = await db.query(
+    "select tgname from pg_trigger where tgname like '%_notify' order by tgname");
+  assert.deepEqual(rows.map((r) => r.tgname), ['courses_notify', 'registrations_notify', 'settings_notify']);
+
+  // Có realtime.send thì mỗi thay đổi phát đúng 1 tín hiệu, không kèm dữ liệu cá nhân.
+  await db.exec(`
+    create schema realtime;
+    create table realtime.sent (payload jsonb, event text, topic text, private boolean);
+    create function realtime.send(payload jsonb, event text, topic text, private boolean default true)
+      returns void language sql as $$ insert into realtime.sent values (payload, event, topic, private) $$;
+  `);
+  await call('register', 'Người mới', phone(1), 4);
+  const sent = await db.query('select * from realtime.sent');
+  assert.deepEqual(sent.rows, [{ payload: {}, event: 'changed', topic: 'pickleball', private: false }]);
+});

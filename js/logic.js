@@ -111,6 +111,10 @@ const ERRORS = {
   INVALID_NAME: 'Họ tên chưa hợp lệ.',
   INVALID_PHONE: 'Số điện thoại cần đủ 10 số, bắt đầu bằng 0.',
   INVALID_COURSE: 'Khóa học không tồn tại.',
+  INVALID_COURSE_NAME: 'Tên khóa cần 1–40 ký tự.',
+  INVALID_SCHEDULE: 'Lịch học tối đa 120 ký tự.',
+  INVALID_CAPACITY: 'Số chỗ phải từ 1 đến 50.',
+  CAPACITY_TOO_SMALL: 'Số chỗ không được ít hơn số người đang có trong khóa. Chuyển bớt người ra trước nhé.',
   NOT_FOUND: 'Không tìm thấy đăng ký với số điện thoại này.',
   FORBIDDEN: 'Tài khoản này không có quyền quản trị.',
   BAD_LOGIN: 'Sai tên đăng nhập hoặc mật khẩu.',
@@ -122,6 +126,13 @@ const ERRORS = {
 /** @param {string} code @returns {string} */
 export function errorMessage(code) {
   return ERRORS[code] ?? 'Có lỗi xảy ra, bạn thử lại sau ít phút nhé.';
+}
+
+/** Danh sách dạng text để dán vào nhóm Zalo. Chỉ có tên, không có SĐT. */
+export function rosterText(title, names, schedule = '') {
+  const head = [title, schedule].filter(Boolean).join(' · ');
+  const lines = names.map((name, i) => `${i + 1}. ${name}`);
+  return [`${head} (${names.length} người)`, ...lines].join('\n');
 }
 
 /** Chặn chèn công thức khi mở CSV bằng Excel (=, +, -, @). */

@@ -1,5 +1,5 @@
 import { createApi } from './api.js';
-import { errorMessage, formatPhone, loginEmail, toCsv, validatePassword } from './logic.js';
+import { errorMessage, formatPhone, loginEmail, rosterText, toCsv, validatePassword } from './logic.js';
 
 const api = createApi();
 const $ = (id) => document.getElementById(id);
@@ -55,6 +55,7 @@ async function guarded(action) {
 
 let swapFrom = null;   // id người đang chờ chọn người để đổi chỗ
 let editingId = null;  // id người đang sửa thông tin
+let editingCourse = null; // id khóa đang sửa tên / số chỗ / lịch
 
 const personOf = (id) => rows.find((r) => r.id === id);
 
@@ -145,7 +146,7 @@ function editRow(row, i) {
   const cancel = () => {
     editingId = null;
     showError(null);
-    render();
+    load(); // Lấy luôn các thay đổi realtime đã bỏ qua trong lúc sửa.
   };
   for (const input of [name, phone]) {
     input.addEventListener('keydown', (e) => {
@@ -205,9 +206,76 @@ function table(list) {
   );
 }
 
-function group(title, meta, list, emptyText) {
+function copyButton(title, list, schedule) {
+  const label = 'Copy danh sách';
+  const button = h('button', { type: 'button', class: 'button button-quiet button-sm', disabled: !list.length }, label);
+  button.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(rosterText(title, list.map((r) => r.full_name), schedule));
+      button.textContent = 'Đã copy ✓';
+      setTimeout(() => { button.textContent = label; }, 2000);
+    } catch {
+      showError('Trình duyệt không cho copy. Thử lại sau khi bấm vào trang, hoặc dùng Xuất Excel.');
+    }
+  });
+  return button;
+}
+
+function courseEditor(course) {
+  const name = h('input', { id: 'course-name', value: course.name, maxlength: '40', autocomplete: 'off' });
+  const capacity = h('input', {
+    id: 'course-capacity', type: 'number', inputmode: 'numeric', value: String(course.capacity),
+    min: String(Math.max(course.taken, 1)), max: '50',
+  });
+  const schedule = h('input', {
+    id: 'course-schedule', value: course.schedule ?? '', maxlength: '120', autocomplete: 'off',
+    placeholder: 'VD: Thứ 3, Thứ 5 · 18:00–19:30 · Sân A',
+  });
+  const save = () => guarded(async () => {
+    await api.adminUpdateCourse(course.id, name.value, Number(capacity.value), schedule.value);
+    editingCourse = null;
+  });
+  const cancel = () => {
+    editingCourse = null;
+    showError(null);
+    load();
+  };
+  const form = h('form', { class: 'course-form', novalidate: true },
+    h('div', { class: 'field' }, h('label', { for: 'course-name' }, 'Tên khóa'), name),
+    h('div', { class: 'field' }, h('label', { for: 'course-capacity' }, 'Số chỗ'), capacity),
+    h('div', { class: 'field course-schedule' }, h('label', { for: 'course-schedule' }, 'Lịch học'), schedule,
+      h('p', { class: 'field-hint' }, 'Hiện trên trang đăng ký. Tăng số chỗ thì người chờ được xếp vào ngay.')),
+    h('div', { class: 'row-actions' },
+      h('button', { type: 'submit', class: 'button button-ball button-sm' }, 'Lưu'),
+      h('button', { type: 'button', class: 'button button-quiet button-sm', 'data-cancel': true }, 'Hủy')),
+  );
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    save();
+  });
+  form.querySelector('[data-cancel]').addEventListener('click', cancel);
+  form.addEventListener('keydown', (e) => e.key === 'Escape' && cancel());
+  queueMicrotask(() => name.focus());
+  return form;
+}
+
+function group(title, meta, list, emptyText, { course = null } = {}) {
+  const tools = [copyButton(title, list, course?.schedule)];
+  if (course) {
+    const edit = h('button', { type: 'button', class: 'button button-quiet button-sm' }, icon('edit'), 'Sửa khóa');
+    edit.addEventListener('click', () => {
+      editingCourse = course.id;
+      render();
+    });
+    tools.unshift(edit);
+  }
   return h('section', { class: 'group' },
-    h('div', { class: 'group-head' }, h('h2', {}, title), h('span', {}, meta)),
+    h('div', { class: 'group-head' },
+      h('div', {},
+        h('h2', {}, title, ' ', h('span', {}, meta)),
+        course?.schedule ? h('p', { class: 'group-schedule' }, course.schedule) : null),
+      h('div', { class: 'group-tools' }, ...tools)),
+    editingCourse === course?.id && course ? courseEditor(course) : null,
     list.length ? table(list) : h('p', { class: 'group-empty' }, emptyText),
   );
 }
@@ -230,6 +298,7 @@ function swapBanner() {
 function render() {
   if (swapFrom != null && !personOf(swapFrom)) swapFrom = null;
   if (editingId != null && !personOf(editingId)) editingId = null;
+  if (editingCourse != null && !status.courses.some((c) => c.id === editingCourse)) editingCourse = null;
   const waiting = rows.filter((r) => r.status === 'waitlist');
   $('summary').replaceChildren(
     ...status.courses.map((c) => h('span', { class: c.taken >= c.capacity ? 'is-full' : null },
@@ -238,12 +307,14 @@ function render() {
   );
   $('is-open').checked = status.is_open;
   $('fill-in-order').checked = status.fill_in_order;
+  const [first, second] = status.courses;
+  if (first && second) $('fill-in-order-label').textContent = `${second.name} chỉ mở khi ${first.name} đủ`;
 
   $('groups').replaceChildren(
     ...[swapBanner()].filter(Boolean),
     ...status.courses.map((c) => group(
       c.name, `${c.taken}/${c.capacity} chỗ`,
-      rows.filter((r) => r.course_id === c.id), 'Chưa có ai đăng ký.',
+      rows.filter((r) => r.course_id === c.id), 'Chưa có ai đăng ký.', { course: c },
     )),
     group('Danh sách chờ', `${waiting.length} người`, waiting, 'Không có ai đang chờ.'),
   );
@@ -349,6 +420,15 @@ $('export').addEventListener('click', () => {
   link.remove();
   URL.revokeObjectURL(url);
 });
+
+// Realtime: có người đăng ký là bảng cập nhật ngay. Đang sửa dở thì chờ, Lưu/Hủy sẽ tải lại.
+let pending = null;
+api.subscribe?.(() => {
+  clearTimeout(pending);
+  pending = setTimeout(() => {
+    if (!$('dash').hidden && editingId == null && editingCourse == null) load();
+  }, 250);
+}).catch(() => {});
 
 if (api.isDemo) $('demo-strip').hidden = false;
 if (api.currentAdmin()) showDash();
