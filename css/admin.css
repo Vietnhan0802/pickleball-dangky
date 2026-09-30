@@ -54,6 +54,12 @@
 }
 .group-head h2 { font-size: 1.0625rem; font-weight: 800; }
 .group-head span { font-size: 0.875rem; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.group-head h2 span { margin-left: 6px; font-weight: 600; }
+.group-schedule { margin: 2px 0 0; font-size: 0.875rem; color: var(--ink-2); }
+.group-tools { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.course-form { display: grid; gap: 0 16px; padding: 16px 20px 4px; border-bottom: 1px solid var(--rule); }
+@media (min-width: 720px) { .course-form { grid-template-columns: 2fr 1fr; } .course-schedule, .course-form .row-actions { grid-column: 1 / -1; } }
+.course-form .row-actions { justify-content: flex-start; margin-bottom: 16px; }
 .group-empty { margin: 0; padding: 16px 20px; color: var(--ink-3); }
 
 .table { width: 100%; border-collapse: collapse; font-size: 0.9375rem; }

@@ -23,6 +23,7 @@ const el = {
 let status = null;
 let selected = null;
 let justLanded = null;
+let arrived = new Set(); // "khóa:tên" của người vừa đăng ký từ máy khác
 let mine = readMine();
 
 function readMine() {
@@ -69,7 +70,8 @@ function renderSlot(course, index) {
   const name = course.members[index];
   if (name == null) return h('span', { class: 'slot is-empty', title: 'Còn trống' });
   const isMine = mine && mine.course_id === course.id && mine.name === name;
-  const isNew = justLanded && justLanded.course_id === course.id && justLanded.seat === index + 1;
+  const isNew = (justLanded && justLanded.course_id === course.id && justLanded.seat === index + 1)
+    || arrived.has(`${course.id}:${name}`);
   const cls = ['slot', 'is-taken', isMine && 'is-mine', isNew && 'is-new'].filter(Boolean).join(' ');
   return h('span', { class: cls, title: name }, initials(name));
 }
@@ -105,6 +107,7 @@ function renderHalf(course) {
     h('div', { class: 'kitchen' },
       h('div', {},
         h('div', { class: 'kitchen-name' }, course.name),
+        course.schedule ? h('div', { class: 'kitchen-schedule' }, course.schedule) : null,
         h('div', { class: 'kitchen-state' }, ...kitchenState(course, availability)),
       ),
       h('div', { class: 'kitchen-count' },
@@ -262,7 +265,8 @@ function showTicket(result) {
     : 'Hẹn gặp bạn ở sân! Quả bóng có viền trắng trên sân là chỗ của bạn.';
   $('ticket-name').textContent = result.full_name;
   $('ticket-slot-label').textContent = waiting ? 'Thứ tự chờ' : 'Chỗ số';
-  $('ticket-slot').textContent = waiting ? `#${result.waitlist_position}` : `${result.seat} / 12`;
+  const capacity = status?.courses.find((c) => c.id === result.course_id)?.capacity;
+  $('ticket-slot').textContent = waiting ? `#${result.waitlist_position}` : `${result.seat} / ${capacity ?? '?'}`;
   el.ticket.hidden = false;
   el.signup.hidden = true;
   el.ticket.focus({ preventScroll: true });
@@ -314,6 +318,7 @@ function renderRoster() {
     });
     return h('div', { class: 'roster-col' },
       h('h3', {}, course.name, h('span', {}, `${course.taken}/${course.capacity}`)),
+      course.schedule ? h('p', { class: 'roster-schedule' }, course.schedule) : null,
       h('ol', {}, ...items),
     );
   });
@@ -333,14 +338,26 @@ function render() {
   if (selected == null && !mine) selected = defaultCourse(status);
   renderCourt();
   justLanded = null; // Bóng chỉ "rơi" một lần, lần vẽ lại sau không lặp animation.
+  arrived = new Set();
   renderNotice();
   renderForm();
   renderRoster();
 }
 
+/** Ai mới có mặt trong khóa so với lần tải trước (để bóng "rơi" xuống sân). */
+function arrivals(before, after) {
+  if (!before) return new Set();
+  return new Set(after.courses.flatMap((course) => {
+    const old = new Set(before.courses.find((c) => c.id === course.id)?.members ?? []);
+    return course.members.filter((name) => !old.has(name)).map((name) => `${course.id}:${name}`);
+  }));
+}
+
 async function refresh() {
   try {
-    status = await api.getStatus();
+    const next = await api.getStatus();
+    arrived = arrivals(status, next);
+    status = next;
     render();
   } catch (err) {
     el.formError.textContent = errorMessage(err.code);
@@ -374,5 +391,11 @@ setupDemo();
 await refresh();
 await restoreMine();
 if (status) render();
+// Realtime: có người đăng ký là sân cập nhật ngay. Poll định kỳ vẫn giữ làm dự phòng.
+let pending = null;
+api.subscribe?.(() => {
+  clearTimeout(pending);
+  pending = setTimeout(refresh, 250);
+}).catch(() => {});
 setInterval(() => document.visibilityState === 'visible' && refresh(), REFRESH_MS);
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && refresh());

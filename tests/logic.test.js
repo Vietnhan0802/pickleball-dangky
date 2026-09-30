@@ -10,6 +10,7 @@ import {
   initials,
   maskPhone,
   errorMessage,
+  rosterText,
   toCsv,
   validatePassword,
   loginEmail,
@@ -113,4 +114,12 @@ test('validatePassword requires 8+ characters and a matching confirmation', () =
   assert.equal(validatePassword('12345678', '12345678'), null);
   assert.match(validatePassword('1234567', '1234567'), /8 ký tự/);
   assert.match(validatePassword('12345678', '12345679'), /không khớp/);
+});
+
+test('rosterText numbers names under a heading, without phone numbers', () => {
+  assert.equal(
+    rosterText('Khóa 4', ['Lê Thu Hà', 'Phạm Đức Huy'], 'T3, T5 · 18:00'),
+    'Khóa 4 · T3, T5 · 18:00 (2 người)\n1. Lê Thu Hà\n2. Phạm Đức Huy',
+  );
+  assert.equal(rosterText('Danh sách chờ', []), 'Danh sách chờ (0 người)');
 });

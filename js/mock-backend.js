@@ -218,6 +218,24 @@ export function createMockBackend(io = {}) {
       return { ok: true };
     },
 
+    async adminUpdateCourse(id, name, capacity, schedule) {
+      requireAdmin();
+      const course = courseOf(id);
+      const cleanTitle = cleanName(name);
+      const cleanSchedule = String(schedule ?? '').trim();
+      if (!course) throw new BackendError('INVALID_COURSE');
+      if (cleanTitle.length < 1 || cleanTitle.length > 40) throw new BackendError('INVALID_COURSE_NAME');
+      if (cleanSchedule.length > 120) throw new BackendError('INVALID_SCHEDULE');
+      if (!Number.isInteger(capacity) || capacity < 1 || capacity > 50) throw new BackendError('INVALID_CAPACITY');
+      if (capacity < registered(id).length) throw new BackendError('CAPACITY_TOO_SMALL');
+      state = {
+        ...state,
+        courses: state.courses.map((c) => (c.id === id ? { ...c, name: cleanTitle, capacity, schedule: cleanSchedule } : c)),
+      };
+      commit({ ...state, rows: promote(state.rows, id) });
+      return { ok: true };
+    },
+
     async adminSettings(isOpen, fillInOrder) {
       requireAdmin();
       commit({
@@ -228,6 +246,11 @@ export function createMockBackend(io = {}) {
         },
       });
       return { ok: true };
+    },
+
+    /** Tab khác đã đổi dữ liệu demo: đọc lại. */
+    reload() {
+      state = io.load?.() ?? state;
     },
 
     async reset() {
