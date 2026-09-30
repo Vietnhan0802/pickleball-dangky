@@ -34,9 +34,13 @@ function createSupabaseBackend({ supabaseUrl, supabaseAnonKey }) {
     try {
       res = await fetch(`${base}${path}`, {
         method: 'POST',
+        // Key kiểu mới (sb_publishable_...) chỉ được gửi qua header apikey;
+        // Authorization chỉ mang JWT: phiên admin, hoặc anon key kiểu cũ (eyJ...).
         headers: {
           apikey: supabaseAnonKey,
-          Authorization: `Bearer ${auth && session ? session.access_token : supabaseAnonKey}`,
+          ...(auth && session
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : supabaseAnonKey.startsWith('eyJ') ? { Authorization: `Bearer ${supabaseAnonKey}` } : {}),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body ?? {}),
