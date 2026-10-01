@@ -127,7 +127,7 @@ test('rosterText numbers names under a heading, without phone numbers', () => {
 });
 
 test('displayName appends the nickname only when there is one', () => {
-  assert.equal(displayName(' Nguyễn  Văn Bình ', ' Bin '), 'Nguyễn Văn Bình (Bin)');
+  assert.equal(displayName(' Nguyễn  Văn Bình ', ' Bin '), 'Nguyễn Văn Bình - Bin');
   assert.equal(displayName('Lê Thu', ''), 'Lê Thu');
   assert.equal(displayName('Lê Thu', undefined), 'Lê Thu');
 });

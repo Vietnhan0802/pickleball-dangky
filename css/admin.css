@@ -72,7 +72,6 @@
 .table th:last-child, .table td:last-child { padding-right: 20px; }
 .table .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .table .name { font-weight: 600; }
-.table .nick { display: block; font-weight: 400; font-size: 0.8125rem; color: var(--ink-3); }
 .row-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; }
 .row-actions select { width: auto; min-height: 38px; padding: 6px 10px; font-size: 0.875rem; }
 .icon-button {

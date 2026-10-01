@@ -321,7 +321,7 @@ function renderRoster() {
       const member = course.members[i];
       if (member == null) return h('li', { class: 'is-open' }, 'Còn trống');
       return h('li', { class: isMineMember(course, member) ? 'is-mine' : null },
-        h('span', {}, member.name, member.nickname ? h('span', { class: 'nick' }, member.nickname) : null));
+        displayName(member.name, member.nickname));
     });
     return h('div', { class: 'roster-col' },
       h('h3', {}, course.name, h('span', {}, `${course.taken}/${course.capacity}`)),
