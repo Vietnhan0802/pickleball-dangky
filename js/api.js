@@ -69,8 +69,8 @@ function createSupabaseBackend({ supabaseUrl, supabaseAnonKey }) {
   return {
     isDemo: false,
     getStatus: () => rpc('get_status'),
-    register: (name, phone, courseId) =>
-      rpc('register', { p_name: name, p_phone: phone, p_course: courseId }),
+    register: (name, phone, courseId, nickname = '') =>
+      rpc('register', { p_name: name, p_phone: phone, p_course: courseId, p_nickname: nickname }),
     lookup: (phone) => rpc('lookup', { p_phone: phone }),
 
     async signIn(email, password) {
@@ -99,7 +99,8 @@ function createSupabaseBackend({ supabaseUrl, supabaseAnonKey }) {
     adminList: () => admin('admin_list'),
     adminMove: (id, courseId) => admin('admin_move', { p_id: id, p_course: courseId }),
     adminDelete: (id) => admin('admin_delete', { p_id: id }),
-    adminUpdate: (id, name, phone) => admin('admin_update', { p_id: id, p_name: name, p_phone: phone }),
+    adminUpdate: (id, name, phone, nickname = null) =>
+      admin('admin_update', { p_id: id, p_name: name, p_phone: phone, p_nickname: nickname }),
     adminSwap: (idA, idB) => admin('admin_swap', { p_a: idA, p_b: idB }),
     adminSettings: (isOpen, fillInOrder) =>
       admin('admin_settings', { p_is_open: isOpen, p_fill_in_order: fillInOrder }),

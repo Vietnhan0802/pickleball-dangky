@@ -14,6 +14,8 @@ import {
   toCsv,
   validatePassword,
   loginEmail,
+  displayName,
+  validateNickname,
 } from '../js/logic.js';
 
 const status = (taken4, taken5, extra = {}) => ({
@@ -97,7 +99,7 @@ test('toCsv escapes quotes, commas and starts with a BOM for Excel', () => {
   const lines = csv.slice(1).split('\r\n');
 
   assert.equal(csv[0], '﻿');
-  assert.equal(lines[0], 'STT,Họ tên,SĐT,Khóa,Trạng thái,Thời gian');
+  assert.equal(lines[0], 'STT,Họ tên,Nickname,SĐT,Khóa,Trạng thái,Thời gian');
   assert.ok(lines[1].includes('"Lê ""Bé"", Ba"'));
   // Giữ số 0 đầu khi mở bằng Excel.
   assert.ok(lines[1].includes('"0901 234 567"'));
@@ -122,4 +124,16 @@ test('rosterText numbers names under a heading, without phone numbers', () => {
     'Khóa 4 · T3, T5 · 18:00 (2 người)\n1. Lê Thu Hà\n2. Phạm Đức Huy',
   );
   assert.equal(rosterText('Danh sách chờ', []), 'Danh sách chờ (0 người)');
+});
+
+test('displayName appends the nickname only when there is one', () => {
+  assert.equal(displayName(' Nguyễn  Văn Bình ', ' Bin '), 'Nguyễn Văn Bình (Bin)');
+  assert.equal(displayName('Lê Thu', ''), 'Lê Thu');
+  assert.equal(displayName('Lê Thu', undefined), 'Lê Thu');
+});
+
+test('validateNickname allows empty and limits length to 30', () => {
+  assert.equal(validateNickname(''), null);
+  assert.equal(validateNickname('x'.repeat(30)), null);
+  assert.match(validateNickname('x'.repeat(31)), /30 ký tự/);
 });

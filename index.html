@@ -51,6 +51,13 @@
           </div>
 
           <div class="field">
+            <label for="nickname">Nickname <span class="optional">(không bắt buộc)</span></label>
+            <input id="nickname" name="nickname" autocomplete="nickname" maxlength="30" placeholder="Bin, Bé Na, Tony…">
+            <p class="field-error" id="nickname-error" hidden></p>
+            <p class="field-hint">Tên mọi người hay gọi bạn, hiện cạnh họ tên để dễ nhận ra nhau.</p>
+          </div>
+
+          <div class="field">
             <label for="phone">Số điện thoại</label>
             <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="16" placeholder="0901 234 567" required>
             <p class="field-error" id="phone-error" hidden></p>

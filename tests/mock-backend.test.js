@@ -27,7 +27,7 @@ test('sample data leaves one seat in course 4', async () => {
   const status = await api.getStatus();
 
   assert.deepEqual(status.courses.map((c) => c.taken), [11, 4]);
-  assert.equal(status.courses[0].members[0], 'Nguyễn Minh Anh');
+  assert.deepEqual(status.courses[0].members[0], { name: 'Nguyễn Minh Anh', nickname: '' });
 });
 
 test('register persists, returns seat and code, and rejects duplicates by phone', async () => {
@@ -70,7 +70,7 @@ test('waitlist and lookup; an admin delete promotes the first person waiting', a
   const seat = (await api.adminList()).find((r) => r.phone === phone(500));
   assert.deepEqual(await api.adminDelete(seat.id), { ok: true });
   assert.deepEqual(await api.lookup(phone(1)), {
-    full_name: 'Chờ Một', status: 'registered', course_id: 5, seat: 12, waitlist_position: null,
+    full_name: 'Chờ Một', nickname: '', status: 'registered', course_id: 5, seat: 12, waitlist_position: null,
   });
   assert.equal((await api.lookup(phone(2))).waitlist_position, 1);
   const waiting = (await api.adminList()).find((r) => r.phone === phone(2));
@@ -182,4 +182,23 @@ test('admin can edit a course like the database does', async () => {
     api.adminUpdateCourse(9, 'Khóa 9', 13, ''),
   ].map((p) => p.catch(codeOf)));
   assert.deepEqual(codes, ['CAPACITY_TOO_SMALL', 'INVALID_COURSE_NAME', 'INVALID_CAPACITY', 'INVALID_SCHEDULE', 'INVALID_COURSE']);
+});
+
+test('nickname is optional, shown publicly and editable like the database does', async () => {
+  const { api } = setup();
+  await api.register('Nguyễn Văn Bình', phone(1), 4, '  Bin   Bin ');
+  await api.register('Lê Thu', phone(2), 4);
+
+  const [course] = (await api.getStatus()).courses;
+  assert.deepEqual(course.members, [{ name: 'Nguyễn Văn Bình', nickname: 'Bin Bin' }, { name: 'Lê Thu', nickname: '' }]);
+  assert.equal((await api.lookup(phone(1))).nickname, 'Bin Bin');
+  await assert.rejects(api.register('Dài Quá', phone(3), 4, 'x'.repeat(31)), (e) => e.code === 'INVALID_NICKNAME');
+
+  await api.signIn(api.demoAdmin.email, api.demoAdmin.password);
+  const [first] = await api.adminList();
+  await api.adminUpdate(first.id, 'Nguyễn Văn Bình', phone(1));
+  assert.equal((await api.lookup(phone(1))).nickname, 'Bin Bin');
+  await api.adminUpdate(first.id, 'Nguyễn Văn Bình', phone(1), ' Bé Bin ');
+  assert.equal((await api.lookup(phone(1))).nickname, 'Bé Bin');
+  await assert.rejects(api.adminUpdate(first.id, 'Nguyễn Văn Bình', phone(1), 'x'.repeat(31)), (e) => e.code === 'INVALID_NICKNAME');
 });

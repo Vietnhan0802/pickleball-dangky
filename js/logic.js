@@ -4,6 +4,7 @@
 const PHONE_PATTERN = /^0\d{9}$/;
 const NAME_MIN = 2;
 const NAME_MAX = 80;
+export const NICKNAME_MAX = 30;
 
 /** @param {string | undefined | null} raw @returns {string} */
 export function normalizePhone(raw) {
@@ -22,6 +23,18 @@ export function validateName(name) {
   if (value.length < NAME_MIN) return 'Nhập họ tên đầy đủ giúp mình nhé.';
   if (value.length > NAME_MAX) return 'Họ tên quá dài (tối đa 80 ký tự).';
   return null;
+}
+
+/** Nickname không bắt buộc, chỉ giới hạn độ dài. @param {string} nickname @returns {string | null} */
+export function validateNickname(nickname) {
+  if (cleanName(nickname).length > NICKNAME_MAX) return `Nickname tối đa ${NICKNAME_MAX} ký tự.`;
+  return null;
+}
+
+/** "Nguyễn Văn An" + "Bin" → "Nguyễn Văn An (Bin)"; không có nickname thì giữ tên. */
+export function displayName(name, nickname) {
+  const nick = cleanName(nickname);
+  return nick ? `${cleanName(name)} (${nick})` : cleanName(name);
 }
 
 /** @param {string} phone @returns {string | null} */
@@ -49,7 +62,8 @@ export function validatePassword(password, confirm) {
 }
 
 /**
- * @typedef {{ id: number, name: string, capacity: number, taken: number, schedule?: string, members: string[] }} Course
+ * @typedef {{ name: string, nickname?: string }} Member
+ * @typedef {{ id: number, name: string, capacity: number, taken: number, schedule?: string, members: Member[] }} Course
  * @typedef {{ is_open: boolean, fill_in_order: boolean, waitlist: number, courses: Course[] }} Status
  * @typedef {{ open: boolean, reason: null | 'full' | 'waiting' | 'closed' | 'missing', left: number }} Availability
  */
@@ -109,6 +123,7 @@ const ERRORS = {
   SEATS_AVAILABLE: 'Vẫn còn chỗ trống — chọn một khóa để giữ chỗ luôn.',
   CLOSED: 'Đăng ký đang tạm đóng.',
   INVALID_NAME: 'Họ tên chưa hợp lệ.',
+  INVALID_NICKNAME: 'Nickname tối đa 30 ký tự.',
   INVALID_PHONE: 'Số điện thoại cần đủ 10 số, bắt đầu bằng 0.',
   INVALID_COURSE: 'Khóa học không tồn tại.',
   INVALID_COURSE_NAME: 'Tên khóa cần 1–40 ký tự.',
@@ -144,12 +159,13 @@ function csvCell(value) {
 
 const STATUS_LABEL = { registered: 'Đã có chỗ', waitlist: 'Danh sách chờ' };
 
-/** @param {Array<{ full_name: string, phone: string, course_id: number | null, status: string, created_at: string }>} rows */
+/** @param {Array<{ full_name: string, nickname?: string, phone: string, course_id: number | null, status: string, created_at: string }>} rows */
 export function toCsv(rows) {
-  const header = 'STT,Họ tên,SĐT,Khóa,Trạng thái,Thời gian';
+  const header = 'STT,Họ tên,Nickname,SĐT,Khóa,Trạng thái,Thời gian';
   const body = rows.map((r, i) => [
     i + 1,
     r.full_name,
+    r.nickname ?? '',
     formatPhone(r.phone),
     r.course_id ? `Khóa ${r.course_id}` : '',
     STATUS_LABEL[r.status] ?? r.status,

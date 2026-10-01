@@ -1,6 +1,6 @@
 // Backend giả lập chạy trong trình duyệt khi chưa cấu hình Supabase (chế độ demo).
 // Mô phỏng đúng các luật trong supabase/schema.sql để xem thử giao diện.
-import { normalizePhone, cleanName } from './logic.js';
+import { normalizePhone, cleanName, NICKNAME_MAX } from './logic.js';
 
 const DEMO_ADMIN = { email: 'admin@pickleball.local', password: 'demo' };
 
@@ -24,6 +24,7 @@ export function sampleState() {
   const rows = SAMPLE_NAMES.map((full_name, i) => ({
     id: i + 1,
     full_name,
+    nickname: '',
     phone: `09${String(10000000 + i * 7919).slice(0, 8)}`,
     course_id: i < 11 ? 4 : 5,
     status: 'registered',
@@ -90,16 +91,18 @@ export function createMockBackend(io = {}) {
         courses: state.courses.map((c) => ({
           ...c,
           taken: registered(c.id).length,
-          members: registered(c.id).sort(byTime).map((r) => r.full_name),
+          members: registered(c.id).sort(byTime).map((r) => ({ name: r.full_name, nickname: r.nickname ?? '' })),
         })),
       };
     },
 
-    async register(name, phone, courseId) {
+    async register(name, phone, courseId, nickname = '') {
       const full_name = cleanName(name);
+      const nick = cleanName(nickname);
       const p = normalizePhone(phone);
       if (!state.settings.is_open) throw new BackendError('CLOSED');
       if (full_name.length < 2 || full_name.length > 80) throw new BackendError('INVALID_NAME');
+      if (nick.length > NICKNAME_MAX) throw new BackendError('INVALID_NICKNAME');
       if (!/^0\d{9}$/.test(p)) throw new BackendError('INVALID_PHONE');
       if (state.rows.some((r) => r.phone === p)) throw new BackendError('ALREADY_REGISTERED');
 
@@ -118,6 +121,7 @@ export function createMockBackend(io = {}) {
       const row = {
         id: state.nextId,
         full_name,
+        nickname: nick,
         phone: p,
         course_id: status === 'registered' ? courseId : null,
         status,
@@ -137,6 +141,7 @@ export function createMockBackend(io = {}) {
       if (!row) return null;
       return {
         full_name: row.full_name,
+        nickname: row.nickname ?? '',
         status: row.status,
         course_id: row.course_id,
         seat: row.status === 'registered' ? position(row) : null,
@@ -184,15 +189,21 @@ export function createMockBackend(io = {}) {
       return { ok: true };
     },
 
-    async adminUpdate(id, name, phone) {
+    /** nickname null/undefined = giữ nguyên nickname cũ (giống admin_update trong schema.sql). */
+    async adminUpdate(id, name, phone, nickname = null) {
       requireAdmin();
       const full_name = cleanName(name);
+      const nick = nickname == null ? null : cleanName(nickname);
       const p = normalizePhone(phone);
       if (!state.rows.some((r) => r.id === id)) throw new BackendError('NOT_FOUND');
       if (full_name.length < 2 || full_name.length > 80) throw new BackendError('INVALID_NAME');
       if (!/^0\d{9}$/.test(p)) throw new BackendError('INVALID_PHONE');
+      if (nick != null && nick.length > NICKNAME_MAX) throw new BackendError('INVALID_NICKNAME');
       if (state.rows.some((r) => r.phone === p && r.id !== id)) throw new BackendError('ALREADY_REGISTERED');
-      commit({ ...state, rows: state.rows.map((r) => (r.id === id ? { ...r, full_name, phone: p } : r)) });
+      commit({
+        ...state,
+        rows: state.rows.map((r) => (r.id === id ? { ...r, full_name, phone: p, nickname: nick ?? r.nickname ?? '' } : r)),
+      });
       return { ok: true };
     },
 
