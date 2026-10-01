@@ -237,6 +237,7 @@
   color: var(--ink-3); font-size: 0.8125rem; font-variant-numeric: tabular-nums;
 }
 .roster-col li.is-open { color: var(--ink-3); }
+.roster-col .nick { margin-left: 8px; font-weight: 500; font-size: 0.8125rem; color: var(--ink-3); }
 .roster-col li.is-mine { font-weight: 700; }
 .roster-col li.is-mine::after { content: "bạn"; margin-left: auto; font-size: 0.75rem; font-weight: 700; color: var(--ball-ink); background: var(--ball); padding: 1px 8px; border-radius: 999px; }
 .roster-empty { margin: 0; color: var(--ink-3); font-size: 0.9375rem; }

@@ -26,6 +26,10 @@ drop function if exists public.cancel(text, text);
 alter table public.registrations drop column if exists cancel_code;
 alter table public.registrations drop column if exists cancel_attempts;
 
+-- Nickname (tùy chọn) để mọi người nhận ra nhau mà không cần nhớ tên thật.
+alter table public.registrations add column if not exists nickname text not null default ''
+  check (char_length(nickname) <= 30);
+
 create index if not exists registrations_course_idx on public.registrations (course_id, created_at);
 
 create table if not exists public.settings (
@@ -124,7 +128,8 @@ returns jsonb language sql stable security definer set search_path = public as $
         'schedule', c.schedule,
         'taken', _taken(c.id),
         'members', (
-          select coalesce(jsonb_agg(r.full_name order by r.created_at, r.id), '[]'::jsonb)
+          select coalesce(jsonb_agg(jsonb_build_object('name', r.full_name, 'nickname', r.nickname)
+                                    order by r.created_at, r.id), '[]'::jsonb)
           from registrations r where r.course_id = c.id and r.status = 'registered'
         )
       ) order by c.id), '[]'::jsonb)
@@ -134,11 +139,13 @@ returns jsonb language sql stable security definer set search_path = public as $
   from settings s
 $$;
 
-create or replace function public.register(p_name text, p_phone text, p_course int)
+drop function if exists public.register(text, text, int);
+create or replace function public.register(p_name text, p_phone text, p_course int, p_nickname text default '')
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v_phone  text := _normalize_phone(p_phone);
   v_name   text := regexp_replace(btrim(coalesce(p_name, '')), '\s+', ' ', 'g');
+  v_nick   text := regexp_replace(btrim(coalesce(p_nickname, '')), '\s+', ' ', 'g');
   v_status text;
   v_course int;
   v_s      settings;
@@ -152,6 +159,9 @@ begin
   end if;
   if char_length(v_name) < 2 or char_length(v_name) > 80 then
     raise exception 'INVALID_NAME' using errcode = 'P0001';
+  end if;
+  if char_length(v_nick) > 30 then
+    raise exception 'INVALID_NICKNAME' using errcode = 'P0001';
   end if;
   if v_phone !~ '^0[0-9]{9}$' then
     raise exception 'INVALID_PHONE' using errcode = 'P0001';
@@ -182,8 +192,8 @@ begin
     v_course := p_course;
   end if;
 
-  insert into registrations (full_name, phone, course_id, status)
-    values (v_name, v_phone, v_course, v_status)
+  insert into registrations (full_name, nickname, phone, course_id, status)
+    values (v_name, v_nick, v_phone, v_course, v_status)
     returning * into v_row;
 
   return jsonb_build_object(
@@ -199,6 +209,7 @@ create or replace function public.lookup(p_phone text)
 returns jsonb language sql stable security definer set search_path = public as $$
   select case when r.id is null then null else jsonb_build_object(
     'full_name', r.full_name,
+    'nickname', r.nickname,
     'status', r.status,
     'course_id', r.course_id,
     'seat', case when r.course_id is null then null else (
@@ -258,11 +269,14 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
-create or replace function public.admin_update(p_id bigint, p_name text, p_phone text)
+-- p_nickname null = giữ nguyên nickname cũ.
+drop function if exists public.admin_update(bigint, text, text);
+create or replace function public.admin_update(p_id bigint, p_name text, p_phone text, p_nickname text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   v_phone text := _normalize_phone(p_phone);
   v_name  text := regexp_replace(btrim(coalesce(p_name, '')), '\s+', ' ', 'g');
+  v_nick  text := regexp_replace(btrim(p_nickname), '\s+', ' ', 'g');
 begin
   if not _is_admin() then raise exception 'FORBIDDEN' using errcode = 'P0001'; end if;
   perform _lock();
@@ -275,10 +289,15 @@ begin
   if v_phone !~ '^0[0-9]{9}$' then
     raise exception 'INVALID_PHONE' using errcode = 'P0001';
   end if;
+  if char_length(v_nick) > 30 then
+    raise exception 'INVALID_NICKNAME' using errcode = 'P0001';
+  end if;
   if exists (select 1 from registrations where phone = v_phone and id <> p_id) then
     raise exception 'ALREADY_REGISTERED' using errcode = 'P0001';
   end if;
-  update registrations set full_name = v_name, phone = v_phone where id = p_id;
+  update registrations
+    set full_name = v_name, phone = v_phone, nickname = coalesce(v_nick, nickname)
+    where id = p_id;
   return jsonb_build_object('ok', true);
 end $$;
 
@@ -373,12 +392,12 @@ drop function if exists public.admin_remove_admin(text);
 
 revoke all on all functions in schema public from public, anon, authenticated;
 grant execute on function public.get_status()                    to anon, authenticated;
-grant execute on function public.register(text, text, int)       to anon, authenticated;
+grant execute on function public.register(text, text, int, text) to anon, authenticated;
 grant execute on function public.lookup(text)                    to anon, authenticated;
 grant execute on function public.admin_list()                    to authenticated;
 grant execute on function public.admin_move(bigint, int)         to authenticated;
 grant execute on function public.admin_delete(bigint)            to authenticated;
 grant execute on function public.admin_settings(boolean, boolean) to authenticated;
-grant execute on function public.admin_update(bigint, text, text) to authenticated;
+grant execute on function public.admin_update(bigint, text, text, text) to authenticated;
 grant execute on function public.admin_swap(bigint, bigint)      to authenticated;
 grant execute on function public.admin_update_course(int, text, int, text) to authenticated;

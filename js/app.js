@@ -1,7 +1,7 @@
 import { createApi } from './api.js';
 import {
-  cleanName, courseAvailability, defaultCourse, errorMessage, initials, isAllFull,
-  normalizePhone, validateName, validatePhone,
+  cleanName, courseAvailability, defaultCourse, displayName, errorMessage, initials, isAllFull,
+  normalizePhone, validateName, validateNickname, validatePhone,
 } from './logic.js';
 
 const REFRESH_MS = 15000;
@@ -12,8 +12,8 @@ const api = createApi();
 const $ = (id) => document.getElementById(id);
 
 const el = {
-  court: $('court'), signup: $('signup'), name: $('name'), phone: $('phone'),
-  nameError: $('name-error'), phoneError: $('phone-error'), formError: $('form-error'),
+  court: $('court'), signup: $('signup'), name: $('name'), nickname: $('nickname'), phone: $('phone'),
+  nameError: $('name-error'), nicknameError: $('nickname-error'), phoneError: $('phone-error'), formError: $('form-error'),
   formTitle: $('form-title'), formSub: $('form-sub'), submit: $('submit'), submitLabel: $('submit-label'),
   notice: $('notice'), ticket: $('ticket'), roster: $('roster'),
   lookupForm: $('lookup-form'), lookupPhone: $('lookup-phone'), lookupResult: $('lookup-result'),
@@ -66,14 +66,15 @@ function icon(name) {
 
 // ─── Sân ─────────────────────────────────────────────────────────────────
 
+const isMineMember = (course, member) => Boolean(mine) && mine.course_id === course.id && mine.name === member.name;
+
 function renderSlot(course, index) {
-  const name = course.members[index];
-  if (name == null) return h('span', { class: 'slot is-empty', title: 'Còn trống' });
-  const isMine = mine && mine.course_id === course.id && mine.name === name;
+  const member = course.members[index];
+  if (member == null) return h('span', { class: 'slot is-empty', title: 'Còn trống' });
   const isNew = (justLanded && justLanded.course_id === course.id && justLanded.seat === index + 1)
-    || arrived.has(`${course.id}:${name}`);
-  const cls = ['slot', 'is-taken', isMine && 'is-mine', isNew && 'is-new'].filter(Boolean).join(' ');
-  return h('span', { class: cls, title: name }, initials(name));
+    || arrived.has(`${course.id}:${member.name}`);
+  const cls = ['slot', 'is-taken', isMineMember(course, member) && 'is-mine', isNew && 'is-new'].filter(Boolean).join(' ');
+  return h('span', { class: cls, title: displayName(member.name, member.nickname) }, initials(member.name));
 }
 
 function kitchenState(course, availability) {
@@ -190,6 +191,7 @@ function renderForm() {
       : 'Chọn khóa để giữ chỗ';
   }
   el.name.disabled = closed;
+  el.nickname.disabled = closed;
   el.phone.disabled = closed;
 }
 
@@ -221,27 +223,32 @@ function setBusy(isBusy, label) {
 el.name.addEventListener('blur', () => el.name.value && showFieldError(el.name, el.nameError, validateName(el.name.value)));
 el.phone.addEventListener('blur', () => el.phone.value && showFieldError(el.phone, el.phoneError, validatePhone(el.phone.value)));
 el.name.addEventListener('input', () => el.name.getAttribute('aria-invalid') === 'true' && showFieldError(el.name, el.nameError, validateName(el.name.value)));
+el.nickname.addEventListener('input', () => showFieldError(el.nickname, el.nicknameError, validateNickname(el.nickname.value)));
 el.phone.addEventListener('input', () => el.phone.getAttribute('aria-invalid') === 'true' && showFieldError(el.phone, el.phoneError, validatePhone(el.phone.value)));
 
 el.signup.addEventListener('submit', async (event) => {
   event.preventDefault();
   el.formError.hidden = true;
   const nameError = validateName(el.name.value);
+  const nicknameError = validateNickname(el.nickname.value);
   const phoneError = validatePhone(el.phone.value);
   showFieldError(el.name, el.nameError, nameError);
+  showFieldError(el.nickname, el.nicknameError, nicknameError);
   showFieldError(el.phone, el.phoneError, phoneError);
   if (nameError) return el.name.focus();
+  if (nicknameError) return el.nickname.focus();
   if (phoneError) return el.phone.focus();
 
   const waitlist = isAllFull(status);
   const courseId = waitlist ? null : selected;
   setBusy(true, waitlist ? 'Đang xếp hàng…' : 'Đang giữ chỗ…');
   try {
-    const result = await api.register(cleanName(el.name.value), el.phone.value, courseId);
     const name = cleanName(el.name.value);
+    const nickname = cleanName(el.nickname.value);
+    const result = await api.register(name, el.phone.value, courseId, nickname);
     writeMine({ name, phone: normalizePhone(el.phone.value), course_id: result.course_id });
     justLanded = result.course_id ? { course_id: result.course_id, seat: result.seat } : null;
-    showTicket({ ...result, full_name: name });
+    showTicket({ ...result, full_name: name, nickname });
     await refresh();
   } catch (err) {
     el.formError.textContent = errorMessage(err.code);
@@ -263,7 +270,7 @@ function showTicket(result) {
   $('ticket-sub').textContent = waiting
     ? 'Khi có người hủy, bạn được xếp vào khóa có chỗ trống theo thứ tự chờ.'
     : 'Hẹn gặp bạn ở sân! Quả bóng có viền trắng trên sân là chỗ của bạn.';
-  $('ticket-name').textContent = result.full_name;
+  $('ticket-name').textContent = displayName(result.full_name, result.nickname);
   $('ticket-slot-label').textContent = waiting ? 'Thứ tự chờ' : 'Chỗ số';
   const capacity = status?.courses.find((c) => c.id === result.course_id)?.capacity;
   $('ticket-slot').textContent = waiting ? `#${result.waitlist_position}` : `${result.seat} / ${capacity ?? '?'}`;
@@ -296,7 +303,7 @@ el.lookupForm.addEventListener('submit', async (event) => {
     if (!result) return showLookupError(errorMessage('NOT_FOUND'));
     el.lookupResult.className = 'lookup-result is-ok';
     el.lookupResult.replaceChildren(
-      h('strong', {}, result.full_name),
+      h('strong', {}, displayName(result.full_name, result.nickname)),
       h('p', {}, describe(result)),
       h('p', {}, 'Muốn hủy hoặc đổi khóa, nhắn người quản trị nhé.'),
     );
@@ -311,10 +318,10 @@ el.lookupForm.addEventListener('submit', async (event) => {
 function renderRoster() {
   const columns = status.courses.map((course) => {
     const items = Array.from({ length: course.capacity }, (_, i) => {
-      const name = course.members[i];
-      if (name == null) return h('li', { class: 'is-open' }, 'Còn trống');
-      const isMine = mine && mine.course_id === course.id && mine.name === name;
-      return h('li', { class: isMine ? 'is-mine' : null }, name);
+      const member = course.members[i];
+      if (member == null) return h('li', { class: 'is-open' }, 'Còn trống');
+      return h('li', { class: isMineMember(course, member) ? 'is-mine' : null },
+        h('span', {}, member.name, member.nickname ? h('span', { class: 'nick' }, member.nickname) : null));
     });
     return h('div', { class: 'roster-col' },
       h('h3', {}, course.name, h('span', {}, `${course.taken}/${course.capacity}`)),
@@ -348,8 +355,8 @@ function render() {
 function arrivals(before, after) {
   if (!before) return new Set();
   return new Set(after.courses.flatMap((course) => {
-    const old = new Set(before.courses.find((c) => c.id === course.id)?.members ?? []);
-    return course.members.filter((name) => !old.has(name)).map((name) => `${course.id}:${name}`);
+    const old = new Set((before.courses.find((c) => c.id === course.id)?.members ?? []).map((m) => m.name));
+    return course.members.filter((m) => !old.has(m.name)).map((m) => `${course.id}:${m.name}`);
   }));
 }
 

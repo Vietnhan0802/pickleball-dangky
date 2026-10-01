@@ -4,7 +4,7 @@ Trang đăng ký nội bộ: mỗi khóa 12 chỗ, mỗi số điện thoại ch
 Khóa nào đủ người thì tự khóa. Cả hai khóa đều đủ thì người đăng ký vào danh sách chờ,
 có người hủy là người chờ lâu nhất được xếp vào.
 
-- `index.html`: trang đăng ký và tra cứu chỗ bằng SĐT. Người học không tự hủy được, chỉ admin mới xóa hoặc chuyển chỗ.
+- `index.html`: trang đăng ký (họ tên, nickname không bắt buộc, SĐT) và tra cứu chỗ bằng SĐT. Nickname hiện cạnh họ tên trong danh sách để mọi người dễ nhận ra nhau. Người học không tự hủy được, chỉ admin mới xóa hoặc chuyển chỗ.
 - `admin.html`: trang quản trị, gồm xem danh sách, chuyển khóa, xóa, sửa khóa (tên, số chỗ, lịch học), copy danh sách để dán Zalo, mở/đóng đăng ký, xuất CSV, đổi mật khẩu
 - Realtime: có người đăng ký là sân và trang admin cập nhật ngay, không cần tải lại
 - `supabase/schema.sql`: database và toàn bộ luật (chặn trùng, giới hạn 12, danh sách chờ)

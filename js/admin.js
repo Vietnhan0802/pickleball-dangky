@@ -1,5 +1,5 @@
 import { createApi } from './api.js';
-import { errorMessage, formatPhone, loginEmail, rosterText, toCsv, validatePassword } from './logic.js';
+import { displayName, errorMessage, formatPhone, loginEmail, rosterText, toCsv, validatePassword } from './logic.js';
 
 const api = createApi();
 const $ = (id) => document.getElementById(id);
@@ -138,9 +138,12 @@ function orderButtons(list, i) {
 
 function editRow(row, i) {
   const name = h('input', { value: row.full_name, 'aria-label': 'Họ tên', maxlength: '80', autocomplete: 'off' });
+  const nickname = h('input', {
+    value: row.nickname ?? '', 'aria-label': 'Nickname', placeholder: 'Nickname', maxlength: '30', autocomplete: 'off',
+  });
   const phone = h('input', { value: formatPhone(row.phone), 'aria-label': 'Số điện thoại', type: 'tel', maxlength: '16', autocomplete: 'off' });
   const save = () => guarded(async () => {
-    await api.adminUpdate(row.id, name.value, phone.value);
+    await api.adminUpdate(row.id, name.value, phone.value, nickname.value);
     editingId = null;
   });
   const cancel = () => {
@@ -148,7 +151,7 @@ function editRow(row, i) {
     showError(null);
     load(); // Lấy luôn các thay đổi realtime đã bỏ qua trong lúc sửa.
   };
-  for (const input of [name, phone]) {
+  for (const input of [name, nickname, phone]) {
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -165,7 +168,7 @@ function editRow(row, i) {
   queueMicrotask(() => name.focus());
   return h('tr', { class: 'is-editing' },
     h('td', {}, String(i + 1)),
-    h('td', {}, name),
+    h('td', {}, h('div', { class: 'edit-name' }, name, nickname)),
     h('td', {}, phone),
     h('td', { class: 'num' }, formatTime(row.created_at)),
     h('td', {}, h('div', { class: 'row-actions' }, saveButton, cancelButton)),
@@ -189,7 +192,7 @@ function viewRow(row, i, list) {
       ];
   return h('tr', { class: cls },
     h('td', {}, String(i + 1)),
-    h('td', { class: 'name' }, row.full_name),
+    h('td', { class: 'name' }, row.full_name, row.nickname ? h('span', { class: 'nick' }, row.nickname) : null),
     h('td', { class: 'num' }, h('a', { href: `tel:${row.phone}` }, formatPhone(row.phone))),
     h('td', { class: 'num' }, formatTime(row.created_at)),
     h('td', {}, h('div', { class: 'row-actions' }, ...actions)),
@@ -211,7 +214,7 @@ function copyButton(title, list, schedule) {
   const button = h('button', { type: 'button', class: 'button button-quiet button-sm', disabled: !list.length }, label);
   button.addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(rosterText(title, list.map((r) => r.full_name), schedule));
+      await navigator.clipboard.writeText(rosterText(title, list.map((r) => displayName(r.full_name, r.nickname)), schedule));
       button.textContent = 'Đã copy ✓';
       setTimeout(() => { button.textContent = label; }, 2000);
     } catch {

@@ -61,8 +61,33 @@ test('registers a person into the chosen course', async () => {
   assert.equal(result.cancel_code, undefined);
 
   const status = await call('get_status');
-  assert.deepEqual(status.courses[0].members, ['Nguyễn Văn A']);
+  assert.deepEqual(status.courses[0].members, [{ name: 'Nguyễn Văn A', nickname: '' }]);
   assert.equal(status.courses[0].taken, 1);
+});
+
+test('nickname is optional, cleaned, shown publicly and editable by admin', async () => {
+  await call('register', 'Nguyễn Văn Bình', phone(1), 4, '  Bin   Bin ');
+  await call('register', 'Lê Thu', phone(2), 4);
+
+  const status = await call('get_status');
+  assert.deepEqual(status.courses[0].members, [
+    { name: 'Nguyễn Văn Bình', nickname: 'Bin Bin' },
+    { name: 'Lê Thu', nickname: '' },
+  ]);
+  assert.equal((await call('lookup', phone(1))).nickname, 'Bin Bin');
+  assert.equal(await errorOf(call('register', 'Dài Quá', phone(3), 4, 'x'.repeat(31))), 'INVALID_NICKNAME');
+
+  await asAdmin('admin@pickleball.local');
+  const [first] = await call('admin_list');
+  assert.equal(first.nickname, 'Bin Bin');
+  // Không truyền nickname: giữ nguyên.
+  await call('admin_update', first.id, 'Nguyễn Văn Bình', phone(1));
+  assert.equal((await call('lookup', phone(1))).nickname, 'Bin Bin');
+  await call('admin_update', first.id, 'Nguyễn Văn Bình', phone(1), ' Bé Bin ');
+  assert.equal((await call('lookup', phone(1))).nickname, 'Bé Bin');
+  await call('admin_update', first.id, 'Nguyễn Văn Bình', phone(1), '');
+  assert.equal((await call('lookup', phone(1))).nickname, '');
+  assert.equal(await errorOf(call('admin_update', first.id, 'Nguyễn Văn Bình', phone(1), 'x'.repeat(31))), 'INVALID_NICKNAME');
 });
 
 test('normalizes +84 phone numbers so the same person cannot register twice', async () => {
