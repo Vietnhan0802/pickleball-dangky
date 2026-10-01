@@ -31,10 +31,10 @@ export function validateNickname(nickname) {
   return null;
 }
 
-/** "Nguyễn Văn An" + "Bin" → "Nguyễn Văn An (Bin)"; không có nickname thì giữ tên. */
+/** "Nguyễn Văn An" + "Bin" → "Nguyễn Văn An - Bin"; không có nickname thì giữ tên. */
 export function displayName(name, nickname) {
   const nick = cleanName(nickname);
-  return nick ? `${cleanName(name)} (${nick})` : cleanName(name);
+  return nick ? `${cleanName(name)} - ${nick}` : cleanName(name);
 }
 
 /** @param {string} phone @returns {string | null} */

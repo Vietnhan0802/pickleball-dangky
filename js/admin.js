@@ -192,7 +192,7 @@ function viewRow(row, i, list) {
       ];
   return h('tr', { class: cls },
     h('td', {}, String(i + 1)),
-    h('td', { class: 'name' }, row.full_name, row.nickname ? h('span', { class: 'nick' }, row.nickname) : null),
+    h('td', { class: 'name' }, displayName(row.full_name, row.nickname)),
     h('td', { class: 'num' }, h('a', { href: `tel:${row.phone}` }, formatPhone(row.phone))),
     h('td', { class: 'num' }, formatTime(row.created_at)),
     h('td', {}, h('div', { class: 'row-actions' }, ...actions)),
